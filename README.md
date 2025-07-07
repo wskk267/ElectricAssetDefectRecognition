@@ -1,1 +1,1 @@
-# ElectricAssetDefectRecognition
+# 电力设备缺陷检测识别
