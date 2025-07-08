@@ -3,8 +3,8 @@
 import axios from 'axios';
 
 const axiosInstance = axios.create({
-  baseURL: 'http://192.168.217.70:8090', 
-  timeout: 3000,
+  baseURL: 'http://localhost:8090', // 改为本地地址，方便开发测试
+  timeout: 10000, // 增加超时时间到10秒
 });
 
 export default axiosInstance;

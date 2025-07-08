@@ -7,6 +7,7 @@
 <script lang="ts">
 import { defineComponent } from 'vue'
 import { useParticles } from './re'
+import '../style.css'
 export default defineComponent({
   setup() {
     const { particlesInit, particlesLoaded, options } = useParticles()
