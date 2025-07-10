@@ -55,8 +55,8 @@ class ImageRecognitionWorker:
         self._setup_optimization()
         
         # 加载模型
-        self.model1 = YOLO("best.pt")  # 主模型
-        self.model2 = YOLO("last.pt")  # 子模型使用同一个模型文件
+        self.model1 = YOLO("best.pt")
+        self.model2 = YOLO("last.pt")
         
         # 模型预热
         self._warmup_models()
@@ -64,12 +64,8 @@ class ImageRecognitionWorker:
     
     def _setup_optimization(self):
         """设置优化配置"""
-        if torch.cuda.is_available():
-            torch.backends.cudnn.benchmark = True
-            torch.backends.cudnn.deterministic = False
-            print(f"使用GPU: {torch.cuda.get_device_name()}")
-        else:
-            print("使用CPU")
+        
+        print("使用CPU")
         
         # 设置线程数避免争用
         torch.set_num_threads(1)

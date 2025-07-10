@@ -98,17 +98,23 @@ export default defineComponent({
 <style scoped>
 .app-container {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
   color: #ffffff;
   font-family: 'Microsoft YaHei', sans-serif;
 }
 
 .navbar {
+  position: fixed;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 30px;
   height: 70px;
+  right: 0;
+  left: 0;
+  z-index: 1000;
   background: rgba(26, 26, 46, 0.9);
   backdrop-filter: blur(10px);
   border-bottom: 2px solid #00f5ff;
@@ -132,6 +138,7 @@ export default defineComponent({
 .nav-menu {
   display: flex;
   gap: 30px;
+  justify-content: flex-end;
 }
 
 .nav-item {
@@ -164,9 +171,11 @@ export default defineComponent({
 
 /* 主内容区域 */
 .main-content {
-  padding: 30px;
-  min-height: calc(100vh - 70px);
+  flex: 1;
+  padding:30px;
+  overflow: auto; /* 如果内容超出，再显示滚动 */
 }
+
 
 
 @media (max-width: 768px) {
