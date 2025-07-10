@@ -41,11 +41,12 @@
                                     <Picture />
                                 </el-icon> 图片预览</span>
                         </div>
-                    </template>                <div class="image-container" v-if="uploadedImage">
+                    </template>      
+                    <div class="image-container" v-if="uploadedImage">
                     <div class="image-wrapper">
-                        <img :src="imagePreview" alt="预览图片" class="preview-image" ref="previewImage" @load="onImageLoad" />
-                        <!-- 边界框叠加层 -->
-                        <div v-if="showBoundingBoxes && recognitionResults.length > 0" class="bounding-boxes-overlay">
+                            <img :src="imagePreview" alt="预览图片" class="preview-image" ref="previewImage" @load="onImageLoad" />
+                            <!-- 边界框叠加层 -->
+                            <div v-if="showBoundingBoxes && recognitionResults.length > 0" class="bounding-boxes-overlay">
                             <div 
                                 v-for="result in filteredResults" 
                                 :key="result.id"
@@ -63,9 +64,9 @@
                                     </span>
                                 </div>
                             </div>
+                            </div>
                         </div>
                     </div>
-                </div>
                     <div v-else class="empty-image">
                         <el-icon>
                             <Picture />
@@ -178,6 +179,8 @@
 import { defineComponent, ref, computed } from 'vue'
 import { Upload, View, Picture, Setting, Menu, DataAnalysis } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import axiosInstance from '../axios'
+import axios from 'axios'
 
 export default defineComponent({
     name: 'ImageRecognition',
@@ -201,25 +204,26 @@ export default defineComponent({
         const recognitionResults = ref<any[]>([])
         const previewImage = ref<HTMLImageElement | null>(null)
 
-        // 资产类别配置（对应后端config.py的ASSET_CATEGORIES）
+        // 资产类别配置（对应后端workerImage.py的CLASS_MAPPING_ZH）
         const assetCategories = [
-            '螺旋阻尼器',
+            '横担',
+            '横担悬挂',
+            '间隔棒',
             '斯托克布里奇阻尼器',
-            '玻璃绝缘子',
-            '玻璃绝缘子大卸扣',
-            '玻璃绝缘子小卸扣',
-            '玻璃绝缘子塔用卸扣',
             '避雷针卸扣',
             '避雷针悬挂',
-            '塔身标识牌',
             '聚合物绝缘子',
+            '玻璃绝缘子',
+            '塔身标识牌',
+            '防振锤',
             '聚合物绝缘子下卸扣',
             '聚合物绝缘子上卸扣',
             '聚合物绝缘子塔用卸扣',
-            '间隔棒',
-            '防振锤',
-            '横担',
-            '横担悬挂'
+            '玻璃绝缘子大卸扣',
+            '玻璃绝缘子小卸扣',
+            '玻璃绝缘子塔用卸扣',
+            '螺旋阻尼器',
+            '球'
         ]
 
         selectedCategories.value = [...assetCategories]
@@ -235,19 +239,16 @@ export default defineComponent({
         const getBboxStyle = (result: any) => {
             if (!previewImage.value) return { display: 'none' }
             
-            const img = previewImage.value
-            const imgWidth = img.clientWidth
-            const imgHeight = img.clientHeight
+            // YOLO格式：center_x, center_y, width, height (都是相对于图片尺寸的比例 0-1)
+            // 直接使用百分比，这样边界框会随图片缩放而自动调整
+            const centerXPercent = result.center.x * 100  // 转换为百分比
+            const centerYPercent = result.center.y * 100
+            const widthPercent = result.width * 100
+            const heightPercent = result.height * 100
             
-            // YOLO格式：center_x, center_y, width, height (都是相对于图片尺寸的比例)
-            const centerX = result.center.x * imgWidth
-            const centerY = result.center.y * imgHeight
-            const boxWidth = result.width * imgWidth
-            const boxHeight = result.height * imgHeight
-            
-            // 计算左上角坐标（相对于图片）
-            const left = centerX - boxWidth / 2
-            const top = centerY - boxHeight / 2
+            // 计算左上角坐标（百分比）
+            const leftPercent = centerXPercent - widthPercent / 2
+            const topPercent = centerYPercent - heightPercent / 2
             
             // 根据缺陷状态和显示选项确定颜色
             let borderColor = '#00f5ff'  // 默认蓝色
@@ -267,11 +268,11 @@ export default defineComponent({
             
             return {
                 position: 'absolute' as const,
-                left: `${left}px`,
-                top: `${top}px`,
-                width: `${boxWidth}px`,
-                height: `${boxHeight}px`,
-                border: `2px solid ${borderColor}`,
+                left: `${leftPercent}%`,
+                top: `${topPercent}%`,
+                width: `${widthPercent}%`,
+                height: `${heightPercent}%`,
+                border: `min(2px, 0.5vh) solid ${borderColor}`, // 响应式边框宽度
                 borderRadius: '4px',
                 backgroundColor: backgroundColor,
                 pointerEvents: 'none' as const
@@ -306,21 +307,24 @@ export default defineComponent({
                 formData.append('file', uploadedImage.value)
 
                 // 调用后端API
-                const response = await fetch('http://localhost:8090/api/predict/file', {
-                    method: 'POST',
-                    body: formData
+                const response = await axiosInstance.post('/api/predict', formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data'
+                    }
                 })
 
-                const result = await response.json()
+                const result = await response.data
 
-                if (result.success && result.data.success) {
+                if (result.success) {
                     const apiData = result.data
                     
                     // 转换API返回的数据格式以匹配前端显示
-                    recognitionResults.value = apiData.predictions.map((pred: any, index: number) => ({
+                    // predictions是对象，需要转换为数组
+                    const predictionsArray = Object.values(apiData.predictions)
+                    recognitionResults.value = predictionsArray.map((pred: any, index: number) => ({
                         id: index + 1,
                         asset_category: pred.asset_category,
-                        defect_status: pred.defect_status,
+                        defect_status: pred.defect_status || '正常',
                         confidence: pred.confidence,
                         center: pred.center,
                         width: pred.width,
@@ -328,7 +332,7 @@ export default defineComponent({
                         isDefective: pred.defect_status === '缺陷'
                     }))
 
-                    ElMessage.success(`识别完成！检测到 ${apiData.total_detections} 个目标，其中 ${apiData.defect_count} 个缺陷`)
+                    ElMessage.success(`识别完成！检测到 ${apiData.detected_objects} 个目标，耗时 ${apiData.inference_time_ms.toFixed(1)}ms`)
                 } else {
                     console.error('识别失败:', result.error || result.message)
                     ElMessage.error(result.error || result.message || '识别失败，请重试')
@@ -684,13 +688,13 @@ export default defineComponent({
 
 .box-label {
     position: absolute;
-    top: -25px;
+    top: -2.5em; /* 使用em单位，相对于字体大小 */
     left: 0;
     background: rgba(0, 0, 0, 0.8);
     color: white;
-    padding: 2px 8px;
+    padding: 0.2em 0.8em; /* 使用em单位 */
     border-radius: 4px;
-    font-size: 12px;
+    font-size: min(12px, 1.5vh); /* 响应式字体大小 */
     font-weight: bold;
     white-space: nowrap;
     z-index: 10;

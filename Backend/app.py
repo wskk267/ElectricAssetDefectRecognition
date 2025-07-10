@@ -2,14 +2,13 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from PIL import Image
 import io
-import base64
 import os
 import logging
 from datetime import datetime
 import traceback
 
 # 导入我们的识别服务
-from workerImage import predict_image, get_service
+from workerImage import process_image
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -40,76 +39,40 @@ def health_check():
 @app.route('/api/predict', methods=['POST'])
 def predict():
     """
-    图片识别预测接口
-    
-    支持两种方式上传图片：
-    1. multipart/form-data 文件上传
-    2. JSON格式的base64编码图片
+    图片识别预测接口 - 文件上传方式
     """
     try:
-        image = None
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'message': '请选择要上传的文件'}), 400
         
-        # 方式1：文件上传
-        if 'file' in request.files:
-            file = request.files['file']
-            if file.filename == '':
-                return jsonify({'error': '未选择文件'}), 400
-            
-            if file and allowed_file(file.filename):
-                try:
-                    # 直接从内存读取图片
-                    image = Image.open(io.BytesIO(file.read()))
-                    logger.info(f"通过文件上传接收图片: {file.filename}, 尺寸: {image.size}")
-                except Exception as e:
-                    return jsonify({'error': f'图片格式错误: {str(e)}'}), 400
-            else:
-                return jsonify({'error': '不支持的文件格式，请上传JPG、PNG、BMP格式的图片'}), 400
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'message': '未选择文件'}), 400
         
-        # 方式2：base64编码
-        elif request.is_json:
-            data = request.get_json()
-            if 'image' not in data:
-                return jsonify({'error': '请提供image字段（base64编码的图片）'}), 400
-            
-            try:
-                # 解码base64图片
-                image_data = data['image']
-                if image_data.startswith('data:image'):
-                    # 移除data:image/jpeg;base64,前缀
-                    image_data = image_data.split(',')[1]
-                
-                image_bytes = base64.b64decode(image_data)
-                image = Image.open(io.BytesIO(image_bytes))
-                logger.info(f"通过base64接收图片，尺寸: {image.size}")
-            except Exception as e:
-                return jsonify({'error': f'base64图片解码失败: {str(e)}'}), 400
+        if not allowed_file(file.filename):
+            return jsonify({'success': False, 'message': '不支持的文件格式，请上传JPG、PNG、BMP格式的图片'}), 400
         
-        else:
-            return jsonify({'error': '请通过文件上传或base64格式提供图片'}), 400
+        # 读取图片
+        image = Image.open(io.BytesIO(file.read()))
         
         # 确保图片是RGB格式
         if image.mode != 'RGB':
             image = image.convert('RGB')
         
+        logger.info(f"接收到图片文件: {file.filename}, 尺寸: {image.size}")
+        
         # 调用识别服务
         logger.info("开始进行图片识别...")
-        result = predict_image(image)
+        result = process_image(image)
         
         # 返回结果
-        if result['success']:
-            logger.info(f"识别成功，检测到 {result['total_detections']} 个目标")
-            return jsonify({
-                'success': True,
-                'message': '识别完成',
-                'data': result
-            })
-        else:
-            logger.error(f"识别失败: {result.get('error', '未知错误')}")
-            return jsonify({
-                'success': False,
-                'message': '识别失败',
-                'error': result.get('error', '未知错误')
-            }), 500
+        logger.info(f"识别成功，检测到 {result['detected_objects']} 个目标，耗时 {result['inference_time_ms']:.2f}ms")
+        return jsonify({
+            'success': True,
+            'message': '识别完成',
+            'filename': file.filename,
+            'data': result
+        })
             
     except Exception as e:
         error_msg = f"API调用失败: {str(e)}"
@@ -156,21 +119,15 @@ def predict_file():
         logger.info(f"接收到图片文件: {file.filename}, 尺寸: {image.size}")
         
         # 进行识别
-        result = predict_image(image)
+        result = process_image(image)
         
-        if result['success']:
-            return jsonify({
-                'success': True,
-                'message': '识别完成',
-                'filename': file.filename,
-                'data': result
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'message': '识别失败',
-                'error': result.get('error', '未知错误')
-            }), 500
+        logger.info(f"识别完成，检测到 {result['detected_objects']} 个目标，耗时 {result['inference_time_ms']:.2f}ms")
+        return jsonify({
+            'success': True,
+            'message': '识别完成',
+            'filename': file.filename,
+            'data': result
+        })
             
     except Exception as e:
         error_msg = f"文件上传识别失败: {str(e)}"
@@ -185,14 +142,14 @@ def predict_file():
 def get_status():
     """获取服务状态"""
     try:
-        service = get_service()
+        from workerImage import worker, CLASS_MAPPING_ZH
         return jsonify({
             'success': True,
             'service_status': 'running',
             'model_loaded': True,
             'supported_formats': ['jpg', 'jpeg', 'png', 'bmp'],
             'max_file_size': '16MB',
-            'defect_categories': list(service.defect_categories.values()),
+            'defect_categories': list(CLASS_MAPPING_ZH.values()),
             'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         })
     except Exception as e:
@@ -240,7 +197,7 @@ if __name__ == '__main__':
     
     # 预先初始化服务（加载模型）
     try:
-        service = get_service()
+        from workerImage import worker
         logger.info("模型加载完成，服务启动成功")
     except Exception as e:
         logger.error(f"模型加载失败: {str(e)}")

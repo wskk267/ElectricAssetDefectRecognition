@@ -15,7 +15,7 @@ class Config:
     UPLOAD_FOLDER = 'uploads'
     
     # 模型配置  
-    YOLO_MODEL_PATH = os.environ.get('YOLO_MODEL_PATH') or '../best.pt'  # 使用根目录的模型
+    YOLO_MODEL_PATH = os.environ.get('YOLO_MODEL_PATH') or 'last.pt'  # 使用根目录的模型
     BACKUP_MODEL_PATH = '../best.pt'  # 备用模型路径
     
     # Roboflow配置
