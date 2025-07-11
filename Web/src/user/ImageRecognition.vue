@@ -602,29 +602,9 @@ export default defineComponent({
     display: flex;
     gap: 15px;
     /* 减小左右面板的间距 */
-    height: 100vh;
+    height:calc(100vh - 120px);
     /* 占满整个视口高度 */
-    padding-top: 60px;
-    /* 为固定导航栏留出空间 */
     box-sizing: border-box;
-}
-
-/* 导航栏样式 */
-.nav-bar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 60px;
-    background: rgba(16, 16, 36, 0.95);
-    border-bottom: 1px solid rgba(0, 245, 255, 0.3);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 20px;
-    z-index: 1000;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
 .logo {

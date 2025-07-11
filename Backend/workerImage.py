@@ -794,6 +794,7 @@ class ImageRecognitionWorker:
                             batch_results[img_idx]["annotated_image"] = f"data:image/png;base64,{img_base64}"
                 
                 batch_time = (time.time() - batch_start) * 1000
+
                 print(f"批次 {batch_idx//batch_size + 1}: {len(batch_images)} 张图片, "
                       f"耗时: {batch_time:.1f}ms, 平均: {batch_time/len(batch_images):.1f}ms/张")
                 
@@ -815,9 +816,9 @@ class ImageRecognitionWorker:
                         img_base64 = base64.b64encode(img_data).decode('utf-8')
                         result_data["annotated_image"] = f"data:image/png;base64,{img_base64}"
                     batch_results.append(result_data)
-            
             all_results.extend(batch_results)
-        
+            
+
         total_time = (time.time() - start_time) * 1000
         if not return_annotated:
             total_detections = sum(r.get("detected_objects", 0) for r in all_results)

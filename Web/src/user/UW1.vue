@@ -172,7 +172,9 @@ export default defineComponent({
 /* 主内容区域 */
 .main-content {
   flex: 1;
-  padding:30px;
+  margin-top: 70px; /* 留出导航栏高度 */
+  padding: 30px;
+  padding-bottom: 0px;
   overflow: auto; /* 如果内容超出，再显示滚动 */
 }
 

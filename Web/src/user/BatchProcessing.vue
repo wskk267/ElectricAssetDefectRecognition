@@ -703,7 +703,7 @@ export default defineComponent({
         }
 
         // 批量下载所有结果
-        const downloadAllResults = () => {
+        const downloadAllResults = async () => {
             const successfulResults = processedFiles.value.filter(file => file.success)
             
             if (successfulResults.length === 0) {
@@ -711,31 +711,74 @@ export default defineComponent({
                 return
             }
 
-            // 创建包含所有结果的ZIP文件（简化版本，使用JSON格式）
-            const allResults = {
-                summary: {
-                    total_files: successfulResults.length,
-                    total_detections: successfulResults.reduce((sum, file) => sum + (file.detectionCount || 0), 0),
-                    processed_time: new Date().toISOString()
-                },
-                results: successfulResults.map(file => ({
-                    filename: file.filename,
-                    detection_count: file.detectionCount,
-                    data: file.data
-                }))
+            // 如果只有一个文件，直接下载单个文件
+            if (successfulResults.length === 1) {
+                const file = successfulResults[0]
+                if (file.downloadUrl) {
+                    const link = document.createElement('a')
+                    link.href = file.downloadUrl
+                    link.download = file.downloadFilename || file.filename
+                    document.body.appendChild(link)
+                    link.click()
+                    document.body.removeChild(link)
+                    return
+                }
             }
 
-            const blob = new Blob([JSON.stringify(allResults, null, 2)], {
-                type: 'application/json'
-            })
-            const url = URL.createObjectURL(blob)
-            const link = document.createElement('a')
-            link.href = url
-            link.download = `batch_processing_results_${new Date().getTime()}.json`
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            URL.revokeObjectURL(url)
+            // 批量下载：创建压缩包或逐个下载
+            try {
+                ElMessage.info('开始下载所有文件...')
+                
+                // 方案1: 逐个下载文件（简单但用户体验较差）
+                for (let i = 0; i < successfulResults.length; i++) {
+                    const file = successfulResults[i]
+                    if (file.downloadUrl) {
+                        // 添加延迟避免浏览器限制
+                        if (i > 0) {
+                            await new Promise(resolve => setTimeout(resolve, 500))
+                        }
+                        
+                        const link = document.createElement('a')
+                        link.href = file.downloadUrl
+                        link.download = file.downloadFilename || file.filename
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                    }
+                }
+                
+                ElMessage.success(`已开始下载 ${successfulResults.length} 个文件`)
+                
+            } catch (error) {
+                console.error('批量下载失败:', error)
+                ElMessage.error('批量下载失败，请尝试单个下载')
+                
+                // 降级方案：下载JSON格式的汇总结果
+                const allResults = {
+                    summary: {
+                        total_files: successfulResults.length,
+                        total_detections: successfulResults.reduce((sum, file) => sum + (file.detectionCount || 0), 0),
+                        processed_time: new Date().toISOString()
+                    },
+                    results: successfulResults.map(file => ({
+                        filename: file.filename,
+                        detection_count: file.detectionCount,
+                        data: file.data
+                    }))
+                }
+
+                const blob = new Blob([JSON.stringify(allResults, null, 2)], {
+                    type: 'application/json'
+                })
+                const url = URL.createObjectURL(blob)
+                const link = document.createElement('a')
+                link.href = url
+                link.download = `batch_processing_results_${new Date().getTime()}.json`
+                document.body.appendChild(link)
+                link.click()
+                document.body.removeChild(link)
+                URL.revokeObjectURL(url)
+            }
         }
 
         // 预览图片

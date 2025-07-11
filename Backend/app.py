@@ -300,11 +300,9 @@ def batch_predict():
                                 update_task_progress(task_id, stage='cancelled')
                                 return
                             
-                            # 更新当前处理文件信息
+                            # 更新当前处理文件信息（仅更新文件名，准备阶段不更新进度）
                             update_task_progress(task_id, 
-                                               current_file_index=len(results) + i,
-                                               current_file_name=file.filename,
-                                               current_file_progress=25)
+                                               current_file_name=f"准备图片: {file.filename}")
                             
                             try:
                                 # 使用缓存的文件数据
@@ -357,7 +355,6 @@ def batch_predict():
                         
                         # 批量处理所有图片
                         if images:
-                            update_task_progress(task_id, current_file_progress=50)
                             logger.info(f"开始批量推理 {len(images)} 张图片...")
                             
                             batch_start_time = time.time()
@@ -370,11 +367,6 @@ def batch_predict():
                             
                             # 处理批量结果
                             for i, (result, filename) in enumerate(zip(batch_results, valid_image_filenames)):
-                                update_task_progress(task_id, 
-                                                   current_file_index=len(results),
-                                                   current_file_name=filename,
-                                                   current_file_progress=100)
-                                
                                 if 'error' in result:
                                     results.append({
                                         'filename': filename,
@@ -392,6 +384,18 @@ def batch_predict():
                                     })
                                     
                                     logger.info(f"批量图片处理完成: {filename}, 检测到 {result['detected_objects']} 个目标")
+                                
+                                # 计算正确的进度：基于总文件数而不是结果数
+                                current_index = len(results)  # 已处理的文件数
+                                total_files = len(image_files) + len(video_files)  # 总文件数
+                                overall_progress = (current_index / total_files) * 100 if total_files > 0 else 0
+                                
+                                # 更新进度
+                                update_task_progress(task_id, 
+                                                   current_file_index=current_index,
+                                                   current_file_name=filename,
+                                                   current_file_progress=100,
+                                                   overall_progress=overall_progress)
                     
                     except Exception as e:
                         logger.error(f"批量图片处理失败: {str(e)}")
@@ -412,9 +416,13 @@ def batch_predict():
                         update_task_progress(task_id, stage='cancelled')
                         break
                     
+                    # 计算当前文件索引（图片 + 视频）
+                    current_file_index = len(image_files) + i + 1
+                    total_files = len(image_files) + len(video_files)
+                    
                     # 更新当前处理文件信息
                     update_task_progress(task_id, 
-                                       current_file_index=len(results),
+                                       current_file_index=current_file_index,
                                        current_file_name=file.filename,
                                        current_file_progress=0)
                     
@@ -437,7 +445,16 @@ def batch_predict():
                         def progress_callback(current_frame, total_frames):
                             if total_frames > 0:
                                 progress_percent = (current_frame / total_frames) * 100
-                                update_task_progress(task_id, current_file_progress=progress_percent)
+                                # 计算当前整体进度
+                                current_completed = len(results)
+                                total_files = len(image_files) + len(video_files)
+                                base_progress = (current_completed / total_files) * 100 if total_files > 0 else 0
+                                file_weight = (1 / total_files) * 100 if total_files > 0 else 0
+                                overall_progress = base_progress + (progress_percent / 100) * file_weight
+                                
+                                update_task_progress(task_id, 
+                                                   current_file_progress=progress_percent,
+                                                   overall_progress=overall_progress)
                         
                         # 调用视频识别服务，返回带标注的视频，传递任务检查函数和进度回调
                         result = process_video_with_annotation(
@@ -458,8 +475,16 @@ def batch_predict():
                         
                         logger.info(f"批量视频处理完成: {file.filename}, 检测到 {result['detected_objects']} 个目标")
                         
-                        # 完成当前文件处理
-                        update_task_progress(task_id, current_file_progress=100)
+                        # 完成当前文件处理，更新文件索引和进度
+                        current_completed = len(results)
+                        total_files = len(image_files) + len(video_files)
+                        overall_progress = (current_completed / total_files) * 100 if total_files > 0 else 0
+                        
+                        update_task_progress(task_id, 
+                                           current_file_index=current_completed,
+                                           current_file_name=file.filename,
+                                           current_file_progress=100,
+                                           overall_progress=overall_progress)
                         
                     except Exception as e:
                         logger.error(f"处理视频文件 {file.filename} 失败: {str(e)}")
@@ -468,11 +493,24 @@ def batch_predict():
                             'success': False,
                             'error': str(e)
                         })
+                        
+                        # 即使失败也要更新进度
+                        current_completed = len(results)
+                        total_files = len(image_files) + len(video_files)
+                        overall_progress = (current_completed / total_files) * 100 if total_files > 0 else 0
+                        
+                        update_task_progress(task_id, 
+                                           current_file_index=current_completed,
+                                           current_file_name=file.filename,
+                                           current_file_progress=100,
+                                           overall_progress=overall_progress)
                 
                 # 处理完成，更新最终进度
                 was_cancelled = is_task_cancelled(task_id)
+                total_files = len(image_files) + len(video_files)
+                
                 update_task_progress(task_id, 
-                                   current_file_index=len(files),
+                                   current_file_index=total_files,
                                    overall_progress=100,
                                    stage='completed' if not was_cancelled else 'cancelled',
                                    processed_files=results)
