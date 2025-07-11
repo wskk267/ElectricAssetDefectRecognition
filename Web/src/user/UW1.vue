@@ -16,11 +16,11 @@
         </div>
         <div 
           class="nav-item" 
-          :class="{ active: activeTab === 'video' }" 
-          @click="switchTab('video')"
+          :class="{ active: activeTab === 'batch' }" 
+          @click="switchTab('batch')"
         >
-          <el-icon><VideoCamera /></el-icon>
-          视频识别
+          <el-icon><FolderOpened /></el-icon>
+          批量处理
         </div>
         <div 
           class="nav-item" 
@@ -43,14 +43,14 @@
 <script lang="ts">
 import { defineComponent, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Picture, VideoCamera, User, Setting } from '@element-plus/icons-vue'
+import { Picture, FolderOpened, User, Setting } from '@element-plus/icons-vue'
 import '../style.css'
 
 export default defineComponent({
   name: 'UW1',
   components: {
     Picture,
-    VideoCamera,
+    FolderOpened,
     User,
     Setting
   },
@@ -63,8 +63,8 @@ export default defineComponent({
       const path = route.path
       if (path.includes('image-recognition')) {
         activeTab.value = 'image'
-      } else if (path.includes('video-recognition')) {
-        activeTab.value = 'video'
+      } else if (path.includes('batch-processing')) {
+        activeTab.value = 'batch'
       } else if (path.includes('user-profile')) {
         activeTab.value = 'profile'
       }
@@ -78,8 +78,8 @@ export default defineComponent({
         case 'image':
           router.push('/image-recognition')
           break
-        case 'video':
-          router.push('/video-recognition')
+        case 'batch':
+          router.push('/batch-processing')
           break
         case 'profile':
           router.push('/user-profile')
