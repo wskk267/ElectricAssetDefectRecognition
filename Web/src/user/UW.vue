@@ -41,10 +41,10 @@
       </div>
       <div class="user-info">
         <span class="username">{{ username }}</span>
-        <el-button type="danger" size="small" @click="logout">
+        <button class="btn-danger btn-sm" @click="logout">
           <el-icon><SwitchButton /></el-icon>
           退出
-        </el-button>
+        </button>
       </div>
     </div>
 
@@ -60,6 +60,7 @@ import { defineComponent, ref, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { Picture, FolderOpened, User, Setting, Monitor, SwitchButton } from '@element-plus/icons-vue'
+import { debounce } from '../utils/common.js'
 import '../style.css'
 
 export default defineComponent({
@@ -91,7 +92,7 @@ export default defineComponent({
       }
     }
 
-    const switchTab = (tab: string) => {
+    const switchTab = debounce((tab: string) => {
       activeTab.value = tab
       switch (tab) {
         case 'image':
@@ -107,7 +108,7 @@ export default defineComponent({
           router.push('/user/profile')
           break
       }
-    }
+    }, 300)
 
     const logout = async () => {
       try {
@@ -149,13 +150,14 @@ export default defineComponent({
 </script>
 
 <style scoped>
+/* 简化的样式，使用共享的CSS变量 */
 .app-container {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
-  color: #ffffff;
-  font-family: 'Microsoft YaHei', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-family);
 }
 
 .navbar {
@@ -168,17 +170,16 @@ export default defineComponent({
   right: 0;
   left: 0;
   z-index: 1000;
-  background: rgba(26, 26, 46, 0.9);
+  background: var(--bg-secondary);
   backdrop-filter: blur(10px);
-  border-bottom: 2px solid #00f5ff;
-  box-shadow: 0 4px 20px rgba(0, 245, 255, 0.3);
+  border-bottom: 2px solid var(--primary-color);
+  box-shadow: var(--shadow-primary);
 }
 
 .nav-title {
   font-size: 24px;
   font-weight: bold;
-  color: #00f5ff;
-  text-shadow: 0 0 10px rgba(0, 245, 255, 0.5);
+  color: var(--primary-color);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -201,7 +202,7 @@ export default defineComponent({
   cursor: pointer;
   transition: all 0.3s ease;
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(0, 245, 255, 0.3);
+  border: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -210,14 +211,14 @@ export default defineComponent({
 
 .nav-item:hover {
   background: rgba(0, 245, 255, 0.1);
-  box-shadow: 0 0 20px rgba(0, 245, 255, 0.4);
+  border-color: var(--primary-color);
   transform: translateY(-2px);
 }
 
 .nav-item.active {
-  background: linear-gradient(45deg, #00f5ff, #0080ff);
+  background: var(--primary-color);
   color: #000;
-  box-shadow: 0 0 25px rgba(0, 245, 255, 0.6);
+  border-color: transparent;
 }
 
 .nav-item .el-icon {
@@ -231,39 +232,23 @@ export default defineComponent({
 }
 
 .username {
-  color: #00f5ff;
+  color: var(--primary-color);
   font-weight: bold;
   padding: 8px 12px;
   background: rgba(0, 245, 255, 0.1);
   border-radius: 20px;
-  border: 1px solid rgba(0, 245, 255, 0.3);
+  border: 1px solid var(--border-color);
 }
 
-:deep(.el-button) {
-  border-radius: 20px;
-}
-
-:deep(.el-button--danger) {
-  background: rgba(255, 71, 87, 0.1);
-  border-color: rgba(255, 71, 87, 0.3);
-  color: #ff4757;
-}
-
-:deep(.el-button--danger:hover) {
-  background: rgba(255, 71, 87, 0.2);
-  border-color: #ff4757;
-  box-shadow: 0 0 15px rgba(255, 71, 87, 0.3);
-}
-
-/* 主内容区域 */
 .main-content {
   flex: 1;
   margin-top: 70px;
   padding: 30px;
-  padding-bottom: 0px;
+  padding-bottom: 0;
   overflow: auto;
 }
 
+/* 响应式设计 */
 @media (max-width: 1200px) {
   .nav-menu {
     gap: 15px;

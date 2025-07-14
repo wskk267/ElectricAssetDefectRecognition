@@ -191,15 +191,16 @@ export default defineComponent({
 }
 
 :deep(.el-dialog__body) {
-  padding: 25px;
+  padding: 30px;
   background: rgba(26, 26, 46, 0.8);
 }
 
 :deep(.el-dialog__footer) {
   background: rgba(26, 26, 46, 0.8);
   border-top: 1px solid rgba(0, 245, 255, 0.2);
-  padding: 20px;
+  padding: 25px 30px;
   border-radius: 0 0 15px 15px;
+  text-align: right;
 }
 
 :deep(.el-form-item__label) {
@@ -261,7 +262,7 @@ export default defineComponent({
 }
 
 :deep(.el-form-item) {
-  margin-bottom: 20px;
+  margin-bottom: 28px;
 }
 
 :deep(.el-form-item small) {

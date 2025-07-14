@@ -1,9 +1,9 @@
 <template>
   <div class="stats-grid">
-    <el-card 
+    <div 
       v-for="(stat, index) in stats" 
       :key="index" 
-      class="stat-card"
+      class="app-card stat-card"
       :class="stat.type"
     >
       <div class="stat-content">
@@ -26,7 +26,7 @@
         </el-icon>
         <span>{{ stat.trend.value }}%</span>
       </div>
-    </el-card>
+    </div>
   </div>
 </template>
 
@@ -76,6 +76,7 @@ export default defineComponent({
 </script>
 
 <style scoped>
+/* 简化的样式，使用共享的CSS变量 */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -84,11 +85,9 @@ export default defineComponent({
 }
 
 .stat-card {
-  background: rgba(26, 26, 46, 0.8);
-  border: 1px solid rgba(0, 245, 255, 0.3);
-  transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  transition: all 0.3s ease;
 }
 
 .stat-card::before {
@@ -107,32 +106,50 @@ export default defineComponent({
 }
 
 .stat-card:hover {
-  border-color: rgba(0, 245, 255, 0.5);
-  box-shadow: 0 8px 25px rgba(0, 245, 255, 0.2);
-  transform: translateY(-2px);
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0, 245, 255, 0.3);
 }
 
 .stat-content {
   display: flex;
   align-items: center;
   gap: 20px;
-  position: relative;
-  z-index: 1;
 }
 
 .stat-icon {
   width: 60px;
   height: 60px;
-  background: linear-gradient(45deg, #00f5ff, #0080ff);
+  background: linear-gradient(45deg, var(--primary-color), var(--primary-dark));
   border-radius: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 5px 15px rgba(0, 245, 255, 0.3);
   transition: all 0.3s ease;
+  box-shadow: 0 5px 15px rgba(0, 245, 255, 0.3);
+  position: relative;
+  z-index: 1;
 }
 
-.stat-icon.active {
+.stat-icon::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: inherit;
+  border-radius: inherit;
+  filter: blur(8px);
+  opacity: 0.7;
+  z-index: -1;
+}
+
+.stat-card:hover .stat-icon {
+  transform: scale(1.1) rotate(5deg);
+  box-shadow: 0 8px 25px rgba(0, 245, 255, 0.5);
+}
+
+.stat-icon.success {
   background: linear-gradient(45deg, #67c23a, #85ce61);
   box-shadow: 0 5px 15px rgba(103, 194, 58, 0.3);
 }
@@ -155,11 +172,6 @@ export default defineComponent({
 .stat-icon .el-icon {
   font-size: 24px;
   color: #000;
-  transition: all 0.3s ease;
-}
-
-.stat-card:hover .stat-icon {
-  transform: scale(1.1) rotate(5deg);
 }
 
 .stat-info {
@@ -168,11 +180,21 @@ export default defineComponent({
 
 .stat-value {
   margin: 0 0 5px 0;
-  color: #00f5ff;
+  color: var(--primary-color);
   font-size: 28px;
   font-weight: bold;
   text-shadow: 0 0 10px rgba(0, 245, 255, 0.3);
   transition: all 0.3s ease;
+}
+
+.stat-card:hover .stat-value {
+  animation: pulse 0.5s ease-in-out;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
 }
 
 .stat-value.success {
@@ -192,14 +214,14 @@ export default defineComponent({
 
 .stat-label {
   margin: 0;
-  color: #888;
+  color: var(--text-secondary);
   font-size: 14px;
   font-weight: 500;
 }
 
 .stat-description {
   margin-top: 5px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -215,6 +237,11 @@ export default defineComponent({
   font-size: 12px;
   font-weight: 500;
   backdrop-filter: blur(5px);
+  transition: all 0.3s ease;
+}
+
+.stat-trend:hover {
+  transform: scale(1.1);
 }
 
 .stat-trend.increase {
@@ -237,34 +264,6 @@ export default defineComponent({
 
 .stat-trend .el-icon {
   font-size: 14px;
-}
-
-/* 特定类型的卡片样式 */
-.stat-card.primary {
-  border-image: linear-gradient(45deg, #00f5ff, #0080ff) 1;
-}
-
-.stat-card.success {
-  border-image: linear-gradient(45deg, #67c23a, #85ce61) 1;
-}
-
-.stat-card.warning {
-  border-image: linear-gradient(45deg, #e6a23c, #f4bd47) 1;
-}
-
-.stat-card.danger {
-  border-image: linear-gradient(45deg, #f56c6c, #f78989) 1;
-}
-
-/* 动画效果 */
-@keyframes statPulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-}
-
-.stat-card:hover .stat-value {
-  animation: statPulse 0.5s ease-in-out;
 }
 
 /* 响应式设计 */

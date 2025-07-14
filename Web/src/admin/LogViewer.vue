@@ -197,7 +197,7 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="剩余额度" width="120">
+          <el-table-column label="剩余额度" width="200">
             <template #default="scope">
               <div class="remain-info">
                 <el-icon style="color: #e6a23c; margin-right: 5px;"><Wallet /></el-icon>

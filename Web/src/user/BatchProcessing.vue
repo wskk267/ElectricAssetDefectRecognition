@@ -1,12 +1,10 @@
 <template>
     <div class="batch-processing">
         <!-- 文件上传区域 -->
-        <el-card class="upload-card">
-            <template #header>
-                <div class="card-header">
-                    <span><el-icon><FolderOpened /></el-icon> 批量文件处理</span>
-                </div>
-            </template>
+        <div class="app-card">
+            <div class="app-card-header">
+                <span><el-icon><FolderOpened /></el-icon> 批量文件处理</span>
+            </div>
 
             <div class="upload-section">
                 <el-upload
@@ -43,51 +41,44 @@
                     </div>
                     
                     <div class="action-buttons">
-                        <el-button 
-                            type="primary" 
-                            :loading="processing" 
-                            @click="startBatchProcessing"
-                            :disabled="fileList.length === 0 || totalSize > maxSize"
+                        <button class="btn-primary" 
+                            :disabled="processing || fileList.length === 0 || totalSize > maxSize"
                             v-if="!processing"
-                            class="process-btn"
+                            @click="startBatchProcessing"
                         >
                             <el-icon><VideoPlay /></el-icon>
                             开始批量处理
-                        </el-button>
+                        </button>
                         
-                        <el-button 
-                            type="danger" 
+                        <button class="btn-danger" 
                             @click="cancelProcessing"
                             v-if="processing && currentTaskId"
-                            class="abort-btn"
                         >
                             <el-icon><CircleClose /></el-icon>
                             取消处理
-                        </el-button>
+                        </button>
                         
-                        <el-button 
-                            @click="clearFiles"
+                        <button class="btn-secondary"
                             :disabled="processing"
+                            @click="clearFiles"
                         >
                             <el-icon><Delete /></el-icon>
                             清空文件
-                        </el-button>
+                        </button>
                     </div>
                 </div>
             </div>
-        </el-card>
+        </div>
 
         <!-- 处理进度区域 -->
-        <el-card class="progress-card" v-if="processing || processedFiles.length > 0">
-            <template #header>
-                <div class="card-header">
-                    <span><el-icon><DataAnalysis /></el-icon> 处理进度</span>
-                    <div class="header-info" v-if="processing">
-                        <span class="status-text">请保持网页连接，处理中断会导致任务失败</span>
-                        <span class="timer-text">已用时: {{ formatElapsedTime(elapsedTime) }}</span>
-                    </div>
+        <div class="app-card" v-if="processing || processedFiles.length > 0">
+            <div class="app-card-header">
+                <span><el-icon><DataAnalysis /></el-icon> 处理进度</span>
+                <div class="app-card-actions" v-if="processing">
+                    <span class="status-text">请保持网页连接，处理中断会导致任务失败</span>
+                    <span class="timer-text">已用时: {{ formatElapsedTime(elapsedTime) }}</span>
                 </div>
-            </template>
+            </div>
 
             <div class="progress-section">
                 <!-- 总体进度 -->
@@ -243,7 +234,7 @@
                     </el-button>
                 </div>
             </div>
-        </el-card>
+        </div>
     </div>
 </template>
 
@@ -256,6 +247,7 @@ import {
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadFile, UploadFiles, UploadRawFile } from 'element-plus'
 import axiosInstance from '../axios'
+import { formatTime, downloadFile, formatFileSize } from '../utils/common'
 
 interface ProcessedFile {
     filename: string
@@ -360,15 +352,6 @@ export default defineComponent({
                 clearInterval(timeInterval.value)
                 timeInterval.value = null
             }
-        }
-
-        // 格式化文件大小
-        const formatFileSize = (bytes: number): string => {
-            if (bytes === 0) return '0 B'
-            const k = 1024
-            const sizes = ['B', 'KB', 'MB', 'GB']
-            const i = Math.floor(Math.log(bytes) / Math.log(k))
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
         }
 
         // 文件类型检查
@@ -884,7 +867,10 @@ export default defineComponent({
             currentFileProgress,
             elapsedTime,
             formatElapsedTime,
+            // formatFileSize 已从 common.js 导入
             formatFileSize,
+            formatTime,
+            downloadFile,
             handleFileChange,
             handleFileRemove,
             beforeUpload,
@@ -979,6 +965,7 @@ export default defineComponent({
     display: flex;
     flex-direction: column;
     gap: 20px;
+    padding: 24px;
 }
 
 :deep(.el-upload-dragger) {
@@ -1118,6 +1105,7 @@ export default defineComponent({
     display: flex;
     flex-direction: column;
     gap: 20px;
+    padding: 24px;
 }
 
 .overall-progress {

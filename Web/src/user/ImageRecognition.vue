@@ -3,14 +3,12 @@
         <div class="left-panel">
             <!-- 合并上传和预览区域 -->
             <div class="image-display-section">
-                <el-card class="image-card">
-                    <template #header>
-                        <div class="card-header">
-                            <span><el-icon>
-                                    <Picture />
-                                </el-icon> 图片识别</span>
-                        </div>
-                    </template>
+                <div class="app-card">
+                    <div class="app-card-header">
+                        <span><el-icon>
+                                <Picture />
+                            </el-icon> 图片识别</span>
+                    </div>
 
                     <div class="image-container">
                         <!-- 当没有图片时显示上传区域 -->
@@ -55,12 +53,12 @@
                         <div v-if="detailViewActive" class="detail-view-overlay" @click="closeDetailedView">
                             <div class="detail-view-container" @click.stop>
                                 <div class="detail-view-header">
-                                    <span>设备详情 #{{ selectedDetail.id }}</span> <el-button class="custom-btn return-btn"
-                                        type="info" plain size="large" @click="closeDetailedView">
+                                    <span>设备详情 #{{ selectedDetail.id }}</span> 
+                                    <button class="btn-secondary" @click="closeDetailedView">
                                         <el-icon class="btn-icon">
                                             <Back />
                                         </el-icon>返回
-                                    </el-button>
+                                    </button>
                                 </div>
                                 <div class="detail-view-content">
                                     <div class="detail-image-container">
@@ -90,33 +88,37 @@
                     </div>
                     <!-- 将按钮移到卡片底部 -->
                     <div v-if="uploadedImage" class="image-controls">
-                        <el-button class="custom-btn reset-btn" type="primary" plain size="large" @click="resetImage">
+                        <button class="btn-primary" @click="resetImage">
                             <el-icon class="btn-icon">
                                 <RefreshRight />
                             </el-icon>重新上传
-                        </el-button>
-                        <el-button class="custom-btn recognize-btn" type="success" :loading="recognizing"
-                            @click="startRecognition" size="large">
+                        </button>
+                        <button class="btn-success" :disabled="recognizing"
+                            @click="startRecognition">
                             <el-icon class="btn-icon">
                                 <Monitor />
                             </el-icon>
                             {{ recognizing ? '识别中...' : '开始识别' }}
-                        </el-button>
+                        </button>
                     </div>
-                </el-card>
+                </div>
             </div>
         </div>
 
         <!-- 中间识别结果面板 -->
         <div v-if="recognitionResults.length > 0" class="middle-panel">
-            <el-card class="results-card">
-                <template #header>
-                    <div class="card-header">
-                        <span><el-icon>
-                                <DataAnalysis />
-                            </el-icon> 识别结果</span>
+            <div class="app-card">
+                <div class="app-card-header">
+                    <span><el-icon>
+                            <DataAnalysis />
+                        </el-icon> 识别结果</span>
+                    <div class="app-card-actions">
+                        <button class="btn-secondary btn-sm" @click="exportResults">
+                            <el-icon><Download /></el-icon>
+                            导出结果
+                        </button>
                     </div>
-                </template>
+                </div>
 
                 <div class="results-list">
                     <div v-for="(result, index) in filteredResults"
@@ -134,20 +136,18 @@
                         </div>
                     </div>
                 </div>
-            </el-card>
+            </div>
         </div>
 
         <!-- 右侧控制面板 -->
         <div class="right-panel">
             <!-- 显示选项 -->
-            <el-card class="control-card">
-                <template #header>
-                    <div class="card-header">
-                        <span><el-icon>
-                                <Setting />
-                            </el-icon> 显示选项</span>
-                    </div>
-                </template>
+            <div class="app-card">
+                <div class="app-card-header">
+                    <span><el-icon>
+                            <Setting />
+                        </el-icon> 显示选项</span>
+                </div>
 
                 <div class="control-options">
                     <div class="option-item">
@@ -176,17 +176,15 @@
                         </el-slider>
                     </div>
                 </div>
-            </el-card>
+            </div>
 
             <!-- 类别筛选 -->
-            <el-card class="control-card">
-                <template #header>
-                    <div class="card-header">
-                        <span><el-icon>
-                                <Menu />
-                            </el-icon> 设备类别筛选</span>
-                    </div>
-                </template>
+            <div class="app-card">
+                <div class="app-card-header">
+                    <span><el-icon>
+                            <Menu />
+                        </el-icon> 设备类别筛选</span>
+                </div>
 
                 <div class="category-filter">
                     <el-checkbox-group v-model="selectedCategories">
@@ -196,17 +194,17 @@
                         </el-checkbox>
                     </el-checkbox-group>
                 </div>
-            </el-card>
+            </div>
         </div>
     </div>
 </template>
 
 <script lang="ts">
-import { ref, computed, watch, onMounted, defineComponent, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, defineComponent, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Setting, Upload, Monitor, RefreshRight, Back, Picture, Menu, DataAnalysis } from '@element-plus/icons-vue'
+import { Setting, Upload, Monitor, RefreshRight, Back, Picture, Menu, DataAnalysis, Download } from '@element-plus/icons-vue'
 import axiosInstance from '../axios'
-import axios from 'axios'
+import { formatTime, downloadFile, generateCSV } from '../utils/common'
 
 export default defineComponent({
     name: 'ImageRecognition',
@@ -218,7 +216,8 @@ export default defineComponent({
         DataAnalysis,
         Back,
         Monitor,
-        RefreshRight
+        RefreshRight,
+        Download
     },
     setup() {
         const uploadedImage = ref<File | null>(null)
@@ -242,6 +241,9 @@ export default defineComponent({
         const selectedResultId = ref<number | null>(null) // 当前选中的结果ID
         const detailImage = ref<string>('') // 原先string base64，并非HTMLImageElement
         const naturalImageSize = ref({ width: 0, height: 0 })
+
+        // 窗口大小变化监听器的引用
+        let resizeListener: (() => void) | null = null
 
         // 设备类别配置（对应后端workerImage.py的CLASS_MAPPING_ZH）
         const assetCategories = [
@@ -270,6 +272,11 @@ export default defineComponent({
             selectedCategories.value = [...assetCategories]
         })
 
+        // 组件卸载时清理
+        onUnmounted(() => {
+            cleanup()
+        })
+
         // 根据类别和置信度过滤结果
         const filteredResults = computed(() => {
             return recognitionResults.value
@@ -293,6 +300,11 @@ export default defineComponent({
 
             if (!container) return {}
 
+            // 等待图片完全加载
+            if (!img.complete || img.naturalWidth === 0) {
+                return { display: 'none' }
+            }
+
             // 获取容器和图片的实际尺寸
             const containerRect = container.getBoundingClientRect()
             const imgRect = img.getBoundingClientRect()
@@ -300,6 +312,12 @@ export default defineComponent({
             // 计算图片在容器中的实际显示尺寸和位置
             const imgDisplayWidth = imgRect.width
             const imgDisplayHeight = imgRect.height
+            
+            // 确保图片已正确加载并有有效尺寸
+            if (imgDisplayWidth === 0 || imgDisplayHeight === 0) {
+                return { display: 'none' }
+            }
+
             const imgOffsetX = (containerRect.width - imgDisplayWidth) / 2
             const imgOffsetY = (containerRect.height - imgDisplayHeight) / 2
 
@@ -347,7 +365,8 @@ export default defineComponent({
                 borderRadius: '4px',
                 backgroundColor: backgroundColor,
                 cursor: 'pointer',
-                pointerEvents: 'auto' as const
+                pointerEvents: 'auto' as const,
+                zIndex: 10
             }
         }
 
@@ -442,16 +461,36 @@ export default defineComponent({
             }
             console.log('图片加载完成，自然尺寸:', naturalImageSize.value)
 
+            // 清理之前的监听器
+            if (resizeListener) {
+                window.removeEventListener('resize', resizeListener)
+            }
+
+            // 创建新的监听器
+            resizeListener = () => {
+                updateBoundingBoxes()
+            }
+
             // 监听窗口大小变化，重新计算边界框位置
-            window.addEventListener('resize', () => {
-                // 触发响应式更新
+            window.addEventListener('resize', resizeListener)
+
+            // 图片加载完成后，如果有识别结果，重新计算边界框位置
+            if (recognitionResults.value.length > 0) {
+                updateBoundingBoxes()
+            }
+        }
+
+        // 更新边界框位置的方法
+        const updateBoundingBoxes = () => {
+            // 等待DOM更新完成
+            nextTick(() => {
+                // 触发响应式更新，强制重新计算边界框位置
                 if (recognitionResults.value.length > 0) {
-                    // 强制重新渲染
-                    const results = recognitionResults.value
+                    const results = [...recognitionResults.value]
                     recognitionResults.value = []
                     setTimeout(() => {
                         recognitionResults.value = results
-                    }, 10)
+                    }, 50) // 增加延迟确保DOM更新完成
                 }
             })
         }
@@ -528,6 +567,11 @@ export default defineComponent({
                     }))
 
                     ElMessage.success(`识别完成！检测到 ${apiData.detected_objects} 个目标，耗时 ${apiData.inference_time_ms.toFixed(1)}ms`)
+                    
+                    // 等待DOM更新完成后重新计算边界框位置
+                    nextTick(() => {
+                        updateBoundingBoxes()
+                    })
                 } else {
                     console.error('识别失败:', result.error || result.message)
                     // 根据错误类型显示不同的消息
@@ -581,6 +625,41 @@ export default defineComponent({
             detailImage.value = canvas.toDataURL('image/png')
         }
 
+        // 导出识别结果
+        const exportResults = () => {
+            if (recognitionResults.value.length === 0) {
+                ElMessage.warning('暂无识别结果可导出')
+                return
+            }
+
+            const exportData = filteredResults.value.map(result => ({
+                '设备ID': result.id,
+                '设备类别': result.asset_category,
+                '缺陷状态': result.defect_status,
+                '置信度': `${(result.confidence * 100).toFixed(1)}%`,
+                '中心位置X': `${(result.center.x * 100).toFixed(1)}%`,
+                '中心位置Y': `${(result.center.y * 100).toFixed(1)}%`,
+                '宽度': `${(result.width * 100).toFixed(1)}%`,
+                '高度': `${(result.height * 100).toFixed(1)}%`,
+                '导出时间': formatTime(new Date())
+            }))
+
+            const headers = ['设备ID', '设备类别', '缺陷状态', '置信度', '中心位置X', '中心位置Y', '宽度', '高度', '导出时间']
+            const csvContent = generateCSV(exportData, headers, (item) => Object.values(item))
+            const filename = `图片识别结果_${new Date().toISOString().slice(0, 10)}.csv`
+            downloadFile(csvContent, filename, 'text/csv')
+            
+            ElMessage.success(`导出成功！共导出 ${exportData.length} 条记录`)
+        }
+
+        // 组件卸载时清理事件监听器
+        const cleanup = () => {
+            if (resizeListener) {
+                window.removeEventListener('resize', resizeListener)
+                resizeListener = null
+            }
+        }
+
         return {
             uploadedImage,
             imagePreview,
@@ -596,6 +675,7 @@ export default defineComponent({
             filteredResults,
             getBboxStyle,
             onImageLoad,
+            updateBoundingBoxes,
             ensureImageSize,
             previewImage,
             detailImage,
@@ -609,7 +689,8 @@ export default defineComponent({
             resetImage,
             shouldShowLabelInside,
             isResultSelected,
-            cropImage
+            cropImage,
+            exportResults
         }
     }
 })
@@ -620,21 +701,12 @@ export default defineComponent({
 .image-recognition {
     display: flex;
     gap: 15px;
-    /* 减小左右面板的间距 */
-    height:calc(100vh - 120px);
-    /* 占满整个视口高度 */
+    height: calc(100vh - 120px);
     box-sizing: border-box;
-}
-
-.logo {
-    color: #00f5ff;
-    font-size: 18px;
-    font-weight: bold;
 }
 
 .left-panel {
     flex: 2;
-    /* 调整左侧面板比例 */
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -643,66 +715,21 @@ export default defineComponent({
 
 .middle-panel {
     flex: 1;
-    /* 中间面板 */
     display: flex;
     flex-direction: column;
     gap: 15px;
     max-width: 350px;
-    /* 限制最大宽度 */
     height: 100%;
     max-height: 80vh;
-    /* 限制最大高度，防止超出 */
 }
 
 .right-panel {
     flex: 0.8;
-    /* 进一步收窄右侧面板 */
     display: flex;
     flex-direction: column;
     gap: 15px;
     max-width: 280px;
-    /* 限制最大宽度 */
     height: 100%;
-}
-
-/* 卡片样式 */
-:deep(.el-card) {
-    background: rgba(26, 26, 46, 0.8);
-    border: 1px solid rgba(0, 245, 255, 0.3);
-    border-radius: 15px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(10px);
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-}
-
-:deep(.el-card__header) {
-    background: rgba(0, 245, 255, 0.1);
-    border-bottom: 1px solid rgba(0, 245, 255, 0.3);
-    padding: 12px 15px;
-    /* 缩小头部高度 */
-}
-
-:deep(.el-card__body) {
-    padding: 15px;
-    flex: 1;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-.card-header {
-    color: #00f5ff;
-    font-weight: bold;
-    font-size: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.card-header .el-icon {
-    font-size: 18px;
 }
 
 /* 上传区域样式 */
@@ -715,7 +742,6 @@ export default defineComponent({
     background: rgba(0, 245, 255, 0.05);
     border-radius: 10px;
     border: 1px dashed rgba(0, 245, 255, 0.2);
-    /* 减小边框 */
 }
 
 :deep(.el-upload-dragger) {
@@ -742,7 +768,7 @@ export default defineComponent({
 
 .upload-icon {
     font-size: 48px;
-    color: #00f5ff;
+    color: var(--primary-color);
     margin-bottom: 15px;
 }
 
@@ -771,15 +797,6 @@ export default defineComponent({
 }
 
 /* 图片展示区域 */
-.image-card {
-    flex: 1;
-    height: 100%;
-    min-height: 0;
-    /* 确保可以收缩 */
-    max-height: calc(100vh - 120px);
-    /* 进一步限制高度 */
-}
-
 .image-container {
     position: relative;
     width: 100%;
@@ -792,9 +809,7 @@ export default defineComponent({
     background: transparent;
     flex: 1;
     min-height: 0;
-    /* 允许收缩 */
     max-height: calc(100vh - 200px);
-    /* 限制容器高度，防止超出页面 */
 }
 
 .image-wrapper {
@@ -811,7 +826,6 @@ export default defineComponent({
 .preview-image {
     max-width: 100%;
     max-height: calc(100vh - 250px);
-    /* 进一步限制高度 */
     width: auto;
     height: auto;
     object-fit: contain;
@@ -828,33 +842,13 @@ export default defineComponent({
     pointer-events: none;
 }
 
-.empty-image {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 300px;
-    color: #666;
-}
-
-.empty-image .el-icon {
-    font-size: 64px;
-    margin-bottom: 15px;
-}
-
 /* 控制面板样式 */
-.control-card {
-    margin-bottom: 15px;
-    height: auto;
-    /* 控制面板高度自适应 */
-}
-
 .control-options {
-    padding: 8px 0;
+    padding: 20px 24px;
 }
 
 .option-item {
-    margin: 12px 0;
+    margin: 18px 0;
     color: #ffffff;
 }
 
@@ -875,21 +869,17 @@ export default defineComponent({
 }
 
 :deep(.el-slider) {
-    --el-slider-main-bg-color: #00f5ff;
+    --el-slider-main-bg-color: var(--primary-color);
     --el-slider-runway-bg-color: rgba(255, 255, 255, 0.2);
 }
 
 :deep(.el-slider__button) {
-    border: 2px solid #00f5ff;
-    background: #00f5ff;
-}
-
-:deep(.el-slider__stop) {
-    background: rgba(255, 255, 255, 0.5);
+    border: 2px solid var(--primary-color);
+    background: var(--primary-color);
 }
 
 :deep(.el-switch) {
-    --el-switch-on-color: #00f5ff;
+    --el-switch-on-color: var(--primary-color);
     --el-switch-off-color: #666;
 }
 
@@ -900,46 +890,36 @@ export default defineComponent({
 /* 类别筛选 */
 .category-filter {
     max-height: 200px;
-    /* 减小高度 */
     overflow-y: auto;
+    padding: 20px 24px;
 }
 
 .category-checkbox {
     display: block;
-    margin: 6px 0;
-    /* 减小间距 */
+    margin: 10px 0;
     color: #ffffff;
 }
 
 :deep(.el-checkbox__label) {
     color: #ffffff;
     font-size: 13px;
-    /* 缩小字体 */
 }
 
 :deep(.el-checkbox__input.is-checked .el-checkbox__inner) {
-    background-color: #00f5ff;
-    border-color: #00f5ff;
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
 }
 
 :deep(.el-checkbox__inner:hover) {
-    border-color: #00f5ff;
+    border-color: var(--primary-color);
 }
 
 /* 识别结果 */
-.results-card {
-    flex: 1;
-    min-height: 0;
-    /* 允许结果卡片收缩 */
-}
-
 .results-list {
     height: 100%;
     overflow-y: auto;
     max-height: calc(100vh - 200px);
-    /* 防止结果列表超出屏幕 */
     padding-right: 5px;
-    /* 为滚动条留出空间 */
 }
 
 .result-item {
@@ -960,29 +940,10 @@ export default defineComponent({
     transform: translateY(-2px);
 }
 
-.result-item::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 5px;
-    height: 100%;
-    background: transparent;
-    transition: all 0.3s ease;
-}
-
-.result-item:hover::after {
-    background: rgba(0, 245, 255, 0.5);
-}
-
 .result-selected {
     background: rgba(0, 245, 255, 0.2);
-    border-color: #00f5ff;
+    border-color: var(--primary-color);
     box-shadow: 0 4px 20px rgba(0, 245, 255, 0.5);
-}
-
-.result-selected::after {
-    background: #00f5ff;
 }
 
 .result-header {
@@ -996,7 +957,7 @@ export default defineComponent({
 
 .result-index {
     font-weight: bold;
-    color: #00f5ff;
+    color: var(--primary-color);
     font-size: 16px;
     text-shadow: 0 0 5px rgba(0, 245, 255, 0.5);
 }
@@ -1017,20 +978,10 @@ export default defineComponent({
 }
 
 /* 边界框样式 */
-.bounding-boxes-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-}
-
 .bounding-box {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
     pointer-events: auto;
-    /* 让边界框可以被点击 */
     box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
     position: relative;
 }
@@ -1045,23 +996,6 @@ export default defineComponent({
         inset 0 0 10px rgba(255, 255, 255, 0.1);
 }
 
-.bounding-box:active {
-    transform: scale(0.98);
-    transition: all 0.1s ease;
-}
-
-.box-normal {
-    border-color: #00f5ff !important;
-    background-color: rgba(0, 245, 255, 0.1) !important;
-    box-shadow: 0 0 15px rgba(0, 245, 255, 0.3);
-}
-
-.box-defect {
-    border-color: #ff4757 !important;
-    background-color: rgba(255, 71, 87, 0.1) !important;
-    box-shadow: 0 0 15px rgba(255, 71, 87, 0.3);
-}
-
 .box-label {
     position: absolute;
     top: 0;
@@ -1071,7 +1005,6 @@ export default defineComponent({
     color: white;
     padding: 2px 5px;
     font-size: min(14px, 1.8vh);
-    /* 响应式字体大小 */
     white-space: nowrap;
     border-radius: 3px;
     pointer-events: none;
@@ -1080,13 +1013,11 @@ export default defineComponent({
     text-overflow: ellipsis;
 }
 
-/* 标签在盒子内部样式 */
 .label-inside {
     top: 5px;
     transform: none;
     border-radius: 4px;
     font-size: min(12px, 1.5vh);
-    /* 内部标签稍小 */
 }
 
 .label-normal {
@@ -1113,7 +1044,6 @@ export default defineComponent({
     height: 100%;
     background: rgba(0, 0, 0, 0.85);
     z-index: 2000;
-    /* 提高层级 */
     display: flex;
     justify-content: center;
     align-items: center;
@@ -1122,11 +1052,8 @@ export default defineComponent({
 
 .detail-view-container {
     width: 95%;
-    /* 增加宽度 */
     max-width: 1400px;
-    /* 增加最大宽度 */
     height: 85%;
-    /* 增加高度 */
     background: rgba(26, 26, 46, 0.95);
     border: 1px solid rgba(0, 245, 255, 0.5);
     border-radius: 15px;
@@ -1146,7 +1073,7 @@ export default defineComponent({
 }
 
 .detail-view-header span {
-    color: #00f5ff;
+    color: var(--primary-color);
     font-size: 18px;
     font-weight: bold;
 }
@@ -1159,27 +1086,22 @@ export default defineComponent({
 
 .detail-image-container {
     flex: 2.5;
-    /* 减少图片区域比例，给信息区域更多空间 */
     position: relative;
     overflow: hidden;
     display: flex;
     justify-content: center;
     align-items: center;
     padding: 15px;
-    /* 减小内边距 */
     background: linear-gradient(145deg, #0E1212, #111);
     border-radius: 8px;
     margin: 10px;
     box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
     min-height: 300px;
-    /* 确保最小高度 */
     max-height: 60vh;
-    /* 限制最大高度 */
 }
 
 .detail-image-wrapper {
     position: relative;
-    /* 弹性大小，根据内容自适应 */
     width: 100%;
     height: 100%;
     overflow: hidden;
@@ -1188,12 +1110,6 @@ export default defineComponent({
     border: 2px solid rgba(0, 245, 255, 0.3);
     transition: all 0.3s ease;
     background-color: #0E1212;
-    /* 让容器根据裁剪内容的宽高比自适应 */
-    aspect-ratio: var(--crop-aspect-ratio, 1);
-    /* 确保背景图片完全覆盖容器，避免黑边 */
-    background-clip: padding-box;
-    /* 添加 contain 以确保图片完整显示在容器内 */
-    object-fit: contain;
 }
 
 .detail-image-wrapper:hover {
@@ -1201,197 +1117,50 @@ export default defineComponent({
     border-color: rgba(0, 245, 255, 0.5);
 }
 
-/* 使用背景图片方式，不需要detail-image样式 */
-
 .detail-info {
     flex: 1;
     padding: 15px;
-    /* 减小内边距 */
     background: rgba(0, 0, 0, 0.2);
     border-left: 1px solid rgba(0, 245, 255, 0.3);
     overflow-y: auto;
     color: #ccc;
     min-width: 250px;
-    /* 设置最小宽度，防止过度挤压 */
 }
 
 .detail-info h3 {
-    color: #00f5ff;
+    color: var(--primary-color);
     margin-top: 0;
     border-bottom: 1px solid rgba(0, 245, 255, 0.2);
     padding-bottom: 8px;
-    /* 减小底部内边距 */
     margin-bottom: 15px;
-    /* 减小底部外边距 */
     font-size: 16px;
-    /* 减小字体大小 */
     font-weight: 600;
 }
 
 .detail-info p {
     margin: 8px 0;
-    /* 减小上下边距 */
     display: flex;
     align-items: center;
     padding: 6px;
-    /* 减小内边距 */
     border-radius: 4px;
-    /* 减小圆角 */
     background: rgba(0, 245, 255, 0.05);
     transition: all 0.3s ease;
     font-size: 13px;
-    /* 减小字体大小 */
     line-height: 1.4;
-    /* 调整行高 */
 }
 
 .detail-info p:hover {
     background: rgba(0, 245, 255, 0.1);
     transform: translateX(3px);
-    /* 减小悬停偏移 */
 }
 
 .detail-info strong {
     color: #fff;
     display: inline-block;
     width: 80px;
-    /* 减小标签宽度 */
     font-weight: 500;
     font-size: 12px;
-    /* 减小标签字体 */
     flex-shrink: 0;
-    /* 防止标签被挤压 */
-}
-
-/* 滚动条样式 */
-::-webkit-scrollbar {
-    width: 6px;
-}
-
-::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb {
-    background: rgba(0, 245, 255, 0.6);
-    border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 245, 255, 0.8);
-}
-
-/* 自定义按钮样式 */
-.custom-btn {
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
-    border-radius: 8px;
-    margin: 0 10px;
-    font-size: 16px;
-    padding: 12px 24px;
-    letter-spacing: 0.8px;
-    font-weight: 600;
-    min-width: 140px;
-}
-
-.custom-btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg,
-            rgba(255, 255, 255, 0) 0%,
-            rgba(255, 255, 255, 0.1) 50%,
-            rgba(255, 255, 255, 0) 100%);
-    transition: all 0.6s ease;
-}
-
-.custom-btn:hover::before {
-    left: 100%;
-}
-
-.btn-icon {
-    margin-right: 8px;
-    font-size: 18px;
-}
-
-.recognize-btn {
-    background: linear-gradient(135deg, #28a745, #20c997) !important;
-    border-color: #20c997 !important;
-    box-shadow: 0 2px 10px rgba(32, 201, 151, 0.3);
-}
-
-.recognize-btn:hover {
-    box-shadow: 0 4px 15px rgba(32, 201, 151, 0.5);
-    transform: translateY(-2px);
-}
-
-.reset-btn {
-    background: linear-gradient(135deg, #2c3e50, #3498db) !important;
-    border-color: #3498db !important;
-    box-shadow: 0 2px 10px rgba(52, 152, 219, 0.3);
-}
-
-.reset-btn:hover {
-    box-shadow: 0 4px 15px rgba(52, 152, 219, 0.5);
-    transform: translateY(-2px);
-}
-
-.return-btn {
-    background: linear-gradient(135deg, #34495e, #7f8c8d) !important;
-    border-color: #7f8c8d !important;
-    box-shadow: 0 2px 10px rgba(127, 140, 141, 0.3);
-}
-
-.return-btn:hover {
-    box-shadow: 0 4px 15px rgba(127, 140, 141, 0.5);
-    transform: translateY(-2px);
-}
-
-/* 添加脉冲边框动画 */
-@keyframes pulse-border {
-    0% {
-        box-shadow:
-            0 0 0 1px rgba(0, 245, 255, 0.3),
-            0 0 0 4px rgba(0, 245, 255, 0.1),
-            0 0 30px rgba(0, 0, 0, 0.5);
-    }
-
-    50% {
-        box-shadow:
-            0 0 0 1px rgba(0, 245, 255, 0.5),
-            0 0 0 8px rgba(0, 245, 255, 0.2),
-            0 0 30px rgba(0, 0, 0, 0.5);
-    }
-
-    100% {
-        box-shadow:
-            0 0 0 1px rgba(0, 245, 255, 0.3),
-            0 0 0 4px rgba(0, 245, 255, 0.1),
-            0 0 30px rgba(0, 0, 0, 0.5);
-    }
-}
-
-/* 设备脉冲动画 */
-@keyframes device-pulse {
-    0% {
-        box-shadow: 0 0 15px currentColor;
-        opacity: 1;
-    }
-
-    50% {
-        box-shadow: 0 0 25px currentColor;
-        opacity: 0.8;
-    }
-
-    100% {
-        box-shadow: 0 0 15px currentColor;
-        opacity: 1;
-    }
 }
 
 /* 响应式设计 */
@@ -1412,19 +1181,6 @@ export default defineComponent({
         width: 90%;
         height: 80%;
     }
-
-    .detail-info {
-        min-width: 200px;
-    }
-
-    .detail-info p {
-        font-size: 12px;
-    }
-
-    .detail-info strong {
-        width: 70px;
-        font-size: 11px;
-    }
 }
 
 @media (max-width: 1200px) {
@@ -1443,16 +1199,6 @@ export default defineComponent({
         max-height: none;
     }
 
-    .middle-panel {
-        order: 2;
-        max-height: 400px;
-        /* 移动端限制高度 */
-    }
-
-    .right-panel {
-        order: 3;
-    }
-
     .detail-view-content {
         flex-direction: column;
     }
@@ -1466,30 +1212,10 @@ export default defineComponent({
     .detail-image-container {
         flex: 1;
         min-height: 250px;
-        /* 移动端保证足够的图片显示空间 */
         max-height: 40vh;
-        /* 限制最大高度，留出空间给信息区域 */
-    }
-
-    .detail-image-wrapper {
-        min-height: 200px;
-        /* 移动端最小高度调整 */
-    }
-
-    .results-list {
-        max-height: 350px;
-    }
-
-    .detail-view-container {
-        width: 95%;
-        /* 移动端增加可视区域 */
-        height: 85%;
-        /* 调整高度比例 */
-        margin: auto;
     }
 }
 
-/* 添加更小屏幕的适配 */
 @media (max-width: 768px) {
     .detail-view-container {
         width: 98%;
@@ -1507,22 +1233,6 @@ export default defineComponent({
     .detail-info {
         padding: 10px;
         font-size: 12px;
-    }
-
-    .detail-info h3 {
-        font-size: 14px;
-        margin-bottom: 10px;
-    }
-
-    .detail-info p {
-        margin: 6px 0;
-        padding: 4px;
-        font-size: 11px;
-    }
-
-    .detail-info strong {
-        width: 60px;
-        font-size: 10px;
     }
 }
 </style>

@@ -1,10 +1,12 @@
 <template>
   <div class="user-management">
     <!-- 用户统计卡片 -->
-    <StatsGrid :stats="userStatsArray" />
+    <div class="stats-section">
+      <StatsGrid :stats="userStatsArray" />
+    </div>
 
     <!-- 操作工具栏 -->
-    <el-card class="toolbar-card">
+    <div class="app-card toolbar-card">
       <div class="toolbar">
         <div class="search-section">
           <el-input 
@@ -20,21 +22,22 @@
         </div>
         
         <div class="action-section">
-          <el-button type="primary" @click="showCreateUserDialog">
+          <button class="btn-primary" @click="showCreateUserDialog">
             <el-icon><Plus /></el-icon>
             创建用户
-          </el-button>
-          <el-button @click="refreshUsers" :loading="loading">
+          </button>
+          <button class="btn-secondary" @click="refreshUsers" :disabled="loading">
             <el-icon><RefreshRight /></el-icon>
             刷新
-          </el-button>
+          </button>
         </div>
       </div>
-    </el-card>
+    </div>
 
     <!-- 用户列表 -->
-    <el-card class="table-card">
-      <el-table 
+    <div class="app-card table-card">
+      <div class="app-table">
+        <el-table 
         :data="filteredUsers" 
         style="width: 100%" 
         v-loading="loading"
@@ -73,32 +76,30 @@
         </el-table-column>
         <el-table-column label="操作" width="300" fixed="right">
           <template #default="scope">
-            <el-button 
-              type="primary" 
-              size="small" 
+            <button 
+              class="btn-primary btn-sm" 
               @click="editUser(scope.row)"
             >
               编辑
-            </el-button>
-            <el-button 
-              :type="scope.row.banned ? 'success' : 'warning'" 
-              size="small" 
+            </button>
+            <button 
+              :class="scope.row.banned ? 'btn-success btn-sm' : 'btn-warning btn-sm'" 
               @click="toggleUserStatus(scope.row)"
             >
               {{ scope.row.banned ? '解封' : '封禁' }}
-            </el-button>
-            <el-button 
-              type="danger" 
-              size="small" 
+            </button>
+            <button 
+              class="btn-danger btn-sm" 
               @click="deleteUser(scope.row)"
               :disabled="scope.row.username === 'admin'"
             >
               删除
-            </el-button>
+            </button>
           </template>
         </el-table-column>
       </el-table>
-    </el-card>
+      </div>
+    </div>
 
     <!-- 创建/编辑用户对话框 -->
     <UserFormDialog
@@ -120,6 +121,7 @@ import {
 import { SHA256 } from '../sha256.js'
 import axiosInstance from '../axios'
 import { useApi } from '../composables/useApi'
+import { formatTime, debounce } from '../utils/common'
 import UserFormDialog from '../components/UserFormDialog.vue'
 import StatsGrid from '../components/StatsGrid.vue'
 
@@ -405,8 +407,9 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* 页面加载动画 */
+/* 页面布局优化 - 增加间距 */
 .user-management {
+  padding: 24px;
   animation: fadeInUp 0.6s ease-out;
 }
 
@@ -421,17 +424,41 @@ export default defineComponent({
   }
 }
 
-/* 用户统计 - 使用StatsGrid组件 */
+/* 区域间距 */
+.stats-section {
+  margin-bottom: 32px;
+}
+
+.toolbar-card {
+  margin-bottom: 24px;
+  padding: 24px;
+}
+
+.table-card {
+  padding: 24px;
+}
 
 /* 工具栏增强 */
 .toolbar {
   background: rgba(0, 245, 255, 0.02);
-  padding: 20px;
+  padding: 0; /* 由于父容器已有padding，这里设为0 */
   border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
 }
 
 .search-section {
   position: relative;
+  flex: 1;
+  max-width: 400px;
+}
+
+.action-section {
+  display: flex;
+  gap: 16px;
+  align-items: center;
 }
 
 .search-input {

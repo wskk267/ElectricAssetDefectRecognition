@@ -1,6 +1,6 @@
 <template>
   <div class="realtime-detection">
-    <div class="coming-soon">
+    <div class="app-card coming-soon">
       <el-icon class="monitor-icon"><Monitor /></el-icon>
       <h3>实时检测</h3>
       <p>功能开发中，敬请期待...</p>
@@ -44,23 +44,20 @@ export default defineComponent({
   align-items: center;
   height: 100%;
   min-height: 500px;
+  padding: 20px;
 }
 
 .coming-soon {
   text-align: center;
   color: #ffffff;
   padding: 40px;
-  background: rgba(26, 26, 46, 0.8);
-  border: 1px solid rgba(0, 245, 255, 0.3);
-  border-radius: 20px;
-  box-shadow: 0 20px 60px rgba(0, 245, 255, 0.2);
-  backdrop-filter: blur(10px);
+  max-width: 600px;
 }
 
 .monitor-icon {
   font-size: 100px;
   margin-bottom: 20px;
-  color: #00f5ff;
+  color: var(--primary-color);
   animation: pulse 2s infinite;
 }
 
@@ -82,7 +79,7 @@ export default defineComponent({
 .coming-soon h3 {
   font-size: 28px;
   margin-bottom: 15px;
-  color: #00f5ff;
+  color: var(--primary-color);
   text-shadow: 0 0 10px rgba(0, 245, 255, 0.5);
 }
 
@@ -114,14 +111,14 @@ export default defineComponent({
 
 .feature-item:hover {
   background: rgba(0, 245, 255, 0.1);
-  border-color: rgba(0, 245, 255, 0.4);
+  border-color: var(--primary-color);
   transform: translateY(-5px);
   box-shadow: 0 10px 30px rgba(0, 245, 255, 0.2);
 }
 
 .feature-item .el-icon {
   font-size: 32px;
-  color: #00f5ff;
+  color: var(--primary-color);
 }
 
 .feature-item span {
