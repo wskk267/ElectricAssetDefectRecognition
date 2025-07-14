@@ -468,9 +468,12 @@ export default defineComponent({
                     }
                 })
 
+                const token = localStorage.getItem('token')
+                
                 const response = await axiosInstance.post('/api/batch', formData, {
                     headers: {
-                        'Content-Type': 'multipart/form-data'
+                        'Content-Type': 'multipart/form-data',
+                        'Authorization': `Bearer ${token}`
                     },
                     timeout: 10000 // 10秒超时，因为这个API现在会立即返回
                 })
@@ -490,7 +493,19 @@ export default defineComponent({
                 }
 
             } catch (error) {
-                ElMessage.error(error instanceof Error ? error.message : '批量处理失败')
+                console.error('批量处理失败:', error)
+                
+                // 检查是否是 HTTP 错误
+                if (error.response && error.response.data) {
+                    const errorData = error.response.data
+                    if (errorData.error_type === 'quota_exceeded') {
+                        ElMessage.error(`批量处理次数已用完！${errorData.message}`)
+                    } else {
+                        ElMessage.error(errorData.message || '批量处理请求失败')
+                    }
+                } else {
+                    ElMessage.error(error instanceof Error ? error.message : '批量处理失败')
+                }
                 
                 processing.value = false
                 currentFile.value = null
@@ -673,8 +688,13 @@ export default defineComponent({
             }
 
             try {
+                const token = localStorage.getItem('token')
                 // 调用后端取消API
-                await axiosInstance.post(`/api/cancel/${currentTaskId.value}`)
+                await axiosInstance.post(`/api/cancel/${currentTaskId.value}`, {}, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                })
                 ElMessage.info('正在取消处理，请稍候...')
             } catch (error) {
                 console.error('取消任务失败:', error)

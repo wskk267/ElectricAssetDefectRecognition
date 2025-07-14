@@ -24,12 +24,27 @@
         </div>
         <div 
           class="nav-item" 
+          :class="{ active: activeTab === 'realtime' }" 
+          @click="switchTab('realtime')"
+        >
+          <el-icon><Monitor /></el-icon>
+          实时检测
+        </div>
+        <div 
+          class="nav-item" 
           :class="{ active: activeTab === 'profile' }" 
           @click="switchTab('profile')"
         >
           <el-icon><User /></el-icon>
           个人中心
         </div>
+      </div>
+      <div class="user-info">
+        <span class="username">{{ username }}</span>
+        <el-button type="danger" size="small" @click="logout">
+          <el-icon><SwitchButton /></el-icon>
+          退出
+        </el-button>
       </div>
     </div>
 
@@ -41,23 +56,27 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from 'vue'
+import { defineComponent, ref, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Picture, FolderOpened, User, Setting } from '@element-plus/icons-vue'
+import { ElMessageBox, ElMessage } from 'element-plus'
+import { Picture, FolderOpened, User, Setting, Monitor, SwitchButton } from '@element-plus/icons-vue'
 import '../style.css'
 
 export default defineComponent({
-  name: 'UW1',
+  name: 'UW',
   components: {
     Picture,
     FolderOpened,
     User,
-    Setting
+    Setting,
+    Monitor,
+    SwitchButton
   },
   setup() {
     const router = useRouter()
     const route = useRoute()
     const activeTab = ref('image')
+    const username = ref('')
 
     const updateActiveTab = () => {
       const path = route.path
@@ -65,31 +84,65 @@ export default defineComponent({
         activeTab.value = 'image'
       } else if (path.includes('batch-processing')) {
         activeTab.value = 'batch'
-      } else if (path.includes('user-profile')) {
+      } else if (path.includes('realtime-detection')) {
+        activeTab.value = 'realtime'
+      } else if (path.includes('profile')) {
         activeTab.value = 'profile'
       }
     }
-
-    watch(() => route.path, updateActiveTab, { immediate: true })
 
     const switchTab = (tab: string) => {
       activeTab.value = tab
       switch (tab) {
         case 'image':
-          router.push('/image-recognition')
+          router.push('/user/image-recognition')
           break
         case 'batch':
-          router.push('/batch-processing')
+          router.push('/user/batch-processing')
+          break
+        case 'realtime':
+          router.push('/user/realtime-detection')
           break
         case 'profile':
-          router.push('/user-profile')
+          router.push('/user/profile')
           break
       }
     }
 
+    const logout = async () => {
+      try {
+        await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        })
+        
+        // 清除本地存储
+        localStorage.removeItem('token')
+        localStorage.removeItem('userType')
+        localStorage.removeItem('userId')
+        localStorage.removeItem('username')
+        localStorage.removeItem('userPermissions')
+        
+        ElMessage.success('退出成功')
+        router.push('/login')
+      } catch {
+        // 用户取消退出
+      }
+    }
+
+    onMounted(() => {
+      username.value = localStorage.getItem('username') || '用户'
+      updateActiveTab()
+    })
+
+    watch(() => route.path, updateActiveTab)
+
     return {
       activeTab,
-      switchTab
+      username,
+      switchTab,
+      logout
     }
   }
 })
@@ -137,12 +190,13 @@ export default defineComponent({
 
 .nav-menu {
   display: flex;
-  gap: 30px;
-  justify-content: flex-end;
+  gap: 20px;
+  justify-content: center;
+  flex: 1;
 }
 
 .nav-item {
-  padding: 12px 24px;
+  padding: 10px 20px;
   border-radius: 25px;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -151,6 +205,7 @@ export default defineComponent({
   display: flex;
   align-items: center;
   gap: 8px;
+  font-size: 14px;
 }
 
 .nav-item:hover {
@@ -166,21 +221,65 @@ export default defineComponent({
 }
 
 .nav-item .el-icon {
-  font-size: 18px;
+  font-size: 16px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.username {
+  color: #00f5ff;
+  font-weight: bold;
+  padding: 8px 12px;
+  background: rgba(0, 245, 255, 0.1);
+  border-radius: 20px;
+  border: 1px solid rgba(0, 245, 255, 0.3);
+}
+
+:deep(.el-button) {
+  border-radius: 20px;
+}
+
+:deep(.el-button--danger) {
+  background: rgba(255, 71, 87, 0.1);
+  border-color: rgba(255, 71, 87, 0.3);
+  color: #ff4757;
+}
+
+:deep(.el-button--danger:hover) {
+  background: rgba(255, 71, 87, 0.2);
+  border-color: #ff4757;
+  box-shadow: 0 0 15px rgba(255, 71, 87, 0.3);
 }
 
 /* 主内容区域 */
 .main-content {
   flex: 1;
-  margin-top: 70px; /* 留出导航栏高度 */
+  margin-top: 70px;
   padding: 30px;
   padding-bottom: 0px;
-  overflow: auto; /* 如果内容超出，再显示滚动 */
+  overflow: auto;
 }
 
+@media (max-width: 1200px) {
+  .nav-menu {
+    gap: 15px;
+  }
+  
+  .nav-item {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+  
+  .nav-title {
+    font-size: 20px;
+  }
+}
 
-
-@media (max-width: 768px) {
+@media (max-width: 968px) {
   .navbar {
     flex-direction: column;
     height: auto;
@@ -193,7 +292,12 @@ export default defineComponent({
     justify-content: center;
   }
   
+  .user-info {
+    margin-top: 15px;
+  }
+  
   .main-content {
+    margin-top: 120px;
     padding: 15px;
   }
   

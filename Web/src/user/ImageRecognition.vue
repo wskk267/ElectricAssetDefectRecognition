@@ -492,10 +492,14 @@ export default defineComponent({
                 const formData = new FormData()
                 formData.append('file', uploadedImage.value)
 
+                // 获取token进行认证
+                const token = localStorage.getItem('token')
+
                 // 调用后端API
                 const response = await axiosInstance.post('/api/predict', formData, {
                     headers: {
-                        'Content-Type': 'multipart/form-data'
+                        'Content-Type': 'multipart/form-data',
+                        'Authorization': `Bearer ${token}`
                     }
                 })
 
@@ -526,12 +530,27 @@ export default defineComponent({
                     ElMessage.success(`识别完成！检测到 ${apiData.detected_objects} 个目标，耗时 ${apiData.inference_time_ms.toFixed(1)}ms`)
                 } else {
                     console.error('识别失败:', result.error || result.message)
-                    ElMessage.error(result.error || result.message || '识别失败，请重试')
+                    // 根据错误类型显示不同的消息
+                    if (result.error_type === 'quota_exceeded') {
+                        ElMessage.error(`识别次数已用完！${result.message}`)
+                    } else {
+                        ElMessage.error(result.error || result.message || '识别失败，请重试')
+                    }
                     recognitionResults.value = []
                 }
             } catch (error) {
                 console.error('API调用失败:', error)
-                ElMessage.error('网络连接失败，请检查后端服务是否启动')
+                // 检查是否是 HTTP 错误
+                if (error.response && error.response.data) {
+                    const errorData = error.response.data
+                    if (errorData.error_type === 'quota_exceeded') {
+                        ElMessage.error(`识别次数已用完！${errorData.message}`)
+                    } else {
+                        ElMessage.error(errorData.message || '网络请求失败')
+                    }
+                } else {
+                    ElMessage.error('网络连接失败，请检查后端服务是否启动')
+                }
                 recognitionResults.value = []
             } finally {
                 recognizing.value = false

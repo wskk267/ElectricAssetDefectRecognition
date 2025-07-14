@@ -5,3 +5,7 @@
   overflow: hidden;
   max-width: 100%;
 }
+
+.el-card__body {
+  margin: 10px !important;
+}
