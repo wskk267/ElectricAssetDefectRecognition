@@ -203,19 +203,45 @@
                             </div>
                             
                             <!-- 视频预览 -->
-                            <div v-if="result.data.annotated_video" class="video-preview">
-                                <video 
-                                    :src="result.data.annotated_video" 
-                                    controls 
-                                    class="annotated-video"
-                                    preload="metadata"
-                                    @error="handleVideoError"
-                                >
-                                    您的浏览器不支持视频播放
-                                </video>
-                                <div class="video-debug-info" v-if="result.data.annotated_video">
-                                    <p>视频数据类型: {{ getVideoDataType(result.data.annotated_video) }}</p>
-                                    <p>数据长度: {{ getVideoDataLength(result.data.annotated_video) }}</p>
+                            <div v-if="result.data.annotated_video || result.data.video_too_large" class="video-preview">
+                                <!-- 视频过大提示 -->
+                                <div v-if="result.data.video_too_large" class="video-too-large-notice">
+                                    <el-alert
+                                        title="视频文件过大"
+                                        :description="`处理后的视频文件大小为 ${result.data.video_size_mb?.toFixed(3)} MB，超出浏览器播放限制。`"
+                                        type="warning"
+                                        show-icon
+                                        :closable="false"
+                                    />
+                                    <div class="video-info-display">
+                                        <h4>视频处理结果:</h4>
+                                        <p>分辨率: {{ result.data.video_info?.resolution }}</p>
+                                        <p>帧率: {{ result.data.video_info?.fps }} FPS</p>
+                                        <p>时长: {{ result.data.video_info?.duration_seconds?.toFixed(1) }} 秒</p>
+                                        <p>检测目标总数: {{ result.data.detected_objects }}</p>
+                                    </div>
+                                </div>
+                                
+                                <!-- 正常视频播放 -->
+                                <div v-else-if="result.data.annotated_video">
+                                    <video 
+                                        :src="result.data.annotated_video" 
+                                        controls 
+                                        class="annotated-video"
+                                        preload="metadata"
+                                        @error="handleVideoError"
+                                        @loadstart="handleVideoLoadStart"
+                                        @canplay="handleVideoCanPlay"
+                                        @loadedmetadata="handleVideoMetadata"
+                                    >
+                                        您的浏览器不支持视频播放
+                                    </video>
+                                    <div class="video-debug-info">
+                                        <p>视频数据类型: {{ getVideoDataType(result.data.annotated_video) }}</p>
+                                        <p>数据大小: {{ getVideoDataLength(result.data.annotated_video) }}</p>
+                                        <p>文件大小: {{ result.data.video_info?.file_size_mb?.toFixed(3) }} MB</p>
+                                        <p>视频状态: {{ getVideoStatus(result.filename) }}</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -244,7 +270,7 @@ import {
     FolderOpened, Upload, VideoPlay, Delete, DataAnalysis, 
     Loading, Check, Close, Download, View, CircleClose 
 } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElAlert } from 'element-plus'
 import type { UploadFile, UploadFiles, UploadRawFile } from 'element-plus'
 import axiosInstance from '../axios'
 import { formatTime, downloadFile, formatFileSize } from '../utils/common'
@@ -482,7 +508,7 @@ export default defineComponent({
                 if (error.response && error.response.data) {
                     const errorData = error.response.data
                     if (errorData.error_type === 'quota_exceeded') {
-                        ElMessage.error(`批量处理次数已用完！${errorData.message}`)
+                        ElMessage.error(`批量处理流量不足！${errorData.message}`)
                     } else {
                         ElMessage.error(errorData.message || '批量处理请求失败')
                     }
@@ -795,10 +821,95 @@ export default defineComponent({
             console.log('预览视频:', result.filename, result.data?.annotated_video ? '有视频数据' : '无视频数据')
         }
 
+        // 视频状态跟踪
+        const videoStatus = ref<{[key: string]: string}>({})
+
         // 视频错误处理
         const handleVideoError = (event: Event) => {
-            console.error('视频播放错误:', event)
-            ElMessage.error('视频播放失败，可能是格式不兼容')
+            const target = event.target as HTMLVideoElement
+            const videoSrc = target.src
+            let errorMsg = '视频播放失败'
+            
+            if (target.error) {
+                switch (target.error.code) {
+                    case target.error.MEDIA_ERR_ABORTED:
+                        errorMsg = '视频播放被中止'
+                        break
+                    case target.error.MEDIA_ERR_NETWORK:
+                        errorMsg = '网络错误导致视频下载失败'
+                        break
+                    case target.error.MEDIA_ERR_DECODE:
+                        errorMsg = '视频解码失败，可能是格式不支持'
+                        break
+                    case target.error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                        errorMsg = '视频格式不支持'
+                        break
+                    default:
+                        errorMsg = '未知的视频播放错误'
+                }
+            }
+            
+            console.error('视频播放错误:', {
+                error: target.error,
+                errorCode: target.error?.code,
+                errorMessage: errorMsg,
+                videoDataSize: videoSrc.length,
+                event: event
+            })
+            
+            // 更新视频状态
+            const filename = getFilenameFromVideoElement(target)
+            if (filename) {
+                videoStatus.value[filename] = `错误: ${errorMsg}`
+            }
+            
+            ElMessage.error(`视频播放失败: ${errorMsg}`)
+        }
+
+        // 视频开始加载
+        const handleVideoLoadStart = (event: Event) => {
+            const target = event.target as HTMLVideoElement
+            const filename = getFilenameFromVideoElement(target)
+            if (filename) {
+                videoStatus.value[filename] = '加载中...'
+            }
+        }
+
+        // 视频可以播放
+        const handleVideoCanPlay = (event: Event) => {
+            const target = event.target as HTMLVideoElement
+            const filename = getFilenameFromVideoElement(target)
+            if (filename) {
+                videoStatus.value[filename] = '就绪'
+            }
+        }
+
+        // 视频元数据加载完成
+        const handleVideoMetadata = (event: Event) => {
+            const target = event.target as HTMLVideoElement
+            const filename = getFilenameFromVideoElement(target)
+            if (filename) {
+                videoStatus.value[filename] = `${target.videoWidth}x${target.videoHeight}, ${target.duration?.toFixed(1)}s`
+            }
+        }
+
+        // 从视频元素获取文件名（辅助函数）
+        const getFilenameFromVideoElement = (videoElement: HTMLVideoElement): string | null => {
+            // 通过父元素查找对应的结果项
+            let parent = videoElement.parentElement
+            while (parent && !parent.classList.contains('result-item')) {
+                parent = parent.parentElement
+            }
+            if (parent) {
+                const nameElement = parent.querySelector('.file-name')
+                return nameElement?.textContent || null
+            }
+            return null
+        }
+
+        // 获取视频状态
+        const getVideoStatus = (filename: string): string => {
+            return videoStatus.value[filename] || '未知'
         }
 
         // 获取视频数据类型（调试用）
@@ -883,6 +994,10 @@ export default defineComponent({
             previewImage,
             previewVideo,
             handleVideoError,
+            handleVideoLoadStart,
+            handleVideoCanPlay,
+            handleVideoMetadata,
+            getVideoStatus,
             getVideoDataType,
             getVideoDataLength
         }
@@ -1401,6 +1516,32 @@ export default defineComponent({
     font-size: 12px;
     color: #ccc;
     text-align: left;
+}
+
+/* 视频过大提示样式 */
+.video-too-large-notice {
+    padding: 20px;
+    text-align: center;
+}
+
+.video-info-display {
+    margin-top: 15px;
+    padding: 15px;
+    background: rgba(0, 245, 255, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(0, 245, 255, 0.3);
+}
+
+.video-info-display h4 {
+    color: #00f5ff;
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+.video-info-display p {
+    color: #ffffff;
+    margin: 5px 0;
+    font-size: 14px;
 }
 
 /* 滚动条样式 */

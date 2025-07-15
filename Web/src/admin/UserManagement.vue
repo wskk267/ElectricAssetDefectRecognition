@@ -54,12 +54,12 @@
         </el-table-column>
         <el-table-column label="图片识别" width="130">
           <template #default="scope">
-            <span class="limit-text">{{ formatLimit(scope.row.imagelimit) }}</span>
+            <span class="limit-text">{{ formatImageLimit(scope.row.imagelimit) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="批量处理" width="130">
+        <el-table-column label="批量流量(MB)" width="130">
           <template #default="scope">
-            <span class="limit-text">{{ formatLimit(scope.row.batchlimit) }}</span>
+            <span class="limit-text">{{ formatBatchLimit(scope.row.batchlimit) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="实时检测" width="130">
@@ -369,8 +369,14 @@ export default defineComponent({
       return new Date(time).toLocaleString('zh-CN')
     }
 
-    const formatLimit = (limit: number) => {
+    // 图片识别限额格式化（整数）
+    const formatImageLimit = (limit: number) => {
       return limit === -1 ? '无限制' : limit.toString()
+    }
+
+    // 批量流量限额格式化（3位小数）
+    const formatBatchLimit = (limit: number) => {
+      return limit === -1 ? '无限制' : `${limit.toFixed(3)}`
     }
 
     onMounted(async () => {
@@ -400,7 +406,8 @@ export default defineComponent({
       refreshUsers,
       handleSearch,
       formatTime,
-      formatLimit
+      formatImageLimit,
+      formatBatchLimit
     }
   }
 })

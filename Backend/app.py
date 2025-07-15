@@ -408,17 +408,9 @@ def cancel_batch_task(task_id):
 def batch_predict(user_info):
     """
     批量处理接口 - 处理多个文件，支持实时进度反馈（需要用户认证）
+    流量计费：根据文件大小(MB)扣除相应额度
     """
     try:
-        # 检查用户批量处理权限
-        if user_info['batchlimit'] == 0:
-            return jsonify({
-                'success': False, 
-                'message': '批量处理次数已用完，请联系管理员增加次数',
-                'error_type': 'quota_exceeded',
-                'remaining_limit': 0
-            }), 403
-        
         # 生成任务ID
         task_id = f"batch_{uuid.uuid4().hex[:8]}"
         register_task(task_id)
@@ -437,9 +429,9 @@ def batch_predict(user_info):
             unregister_task(task_id)
             return jsonify({'success': False, 'message': '最多只能处理100个文件'}), 400
         
-        # 检查总文件大小
+        # 检查总文件大小并计算所需流量
         file_data_cache = {}  # 缓存文件数据，避免重复读取
-        total_size = 0
+        total_size_bytes = 0
         
         logger.info(f"用户{user_info['username']}开始缓存 {len(files)} 个文件的数据...")
         for i, file in enumerate(files):
@@ -447,18 +439,35 @@ def batch_predict(user_info):
                 file.seek(0)
                 data = file.read()
                 file_data_cache[file.filename] = data
-                total_size += len(data)
+                total_size_bytes += len(data)
                 logger.info(f"缓存文件 {i+1}/{len(files)}: {file.filename} ({len(data)} bytes)")
             except Exception as e:
                 logger.error(f"缓存文件 {file.filename} 失败: {str(e)}")
                 unregister_task(task_id)
                 return jsonify({'success': False, 'message': f'读取文件失败: {str(e)}'}), 400
         
-        logger.info(f"文件缓存完成，总大小: {total_size} bytes")
+        # 计算所需流量 (MB)
+        total_size_mb = total_size_bytes / (1024 * 1024)
+        required_quota = round(total_size_mb, 3)  # 保留3位小数
         
-        if total_size > 100 * 1024 * 1024:  # 100MB
+        logger.info(f"文件缓存完成，总大小: {total_size_bytes} bytes ({total_size_mb:.3f} MB), 需要流量: {required_quota:.3f} MB")
+        
+        # 检查文件大小限制
+        if total_size_bytes > 100 * 1024 * 1024:  # 100MB
             unregister_task(task_id)
             return jsonify({'success': False, 'message': '文件总大小不能超过100MB'}), 400
+        
+        # 检查用户流量是否足够
+        if user_info['batchlimit'] != -1:  # 不是无限制用户
+            if user_info['batchlimit'] < required_quota:
+                unregister_task(task_id)
+                return jsonify({
+                    'success': False, 
+                    'message': f'流量不足！需要 {required_quota:.3f} MB，剩余 {user_info["batchlimit"]:.3f} MB',
+                    'error_type': 'quota_exceeded',
+                    'required_quota': round(required_quota, 3),
+                    'remaining_quota': round(user_info['batchlimit'], 3)
+                }), 403
         
         # 初始化进度
         update_task_progress(task_id, 
@@ -468,6 +477,8 @@ def batch_predict(user_info):
         # 使用后台线程处理文件，立即返回任务ID
         def process_files_background():
             results = []
+            # 实际使用的流量就是提交的文件总大小
+            actual_quota_used = round(required_quota, 3)  # 保留3位小数
             
             try:
                 # 分离图片和视频文件
@@ -750,23 +761,41 @@ def batch_predict(user_info):
                 was_cancelled = is_task_cancelled(task_id)
                 total_files = len(image_files) + len(video_files)
                 
+                # 计算实际使用的流量（基于成功处理的文件）
+                successful_results = [r for r in results if r['success']]
+                if successful_results:
+                    # 计算成功处理文件的总大小
+                    for result in successful_results:
+                        filename = result['filename']
+                        if filename in file_data_cache:
+                            file_size_mb = len(file_data_cache[filename]) / (1024 * 1024)
+                            quota_used += file_size_mb
+                
                 update_task_progress(task_id, 
                                    current_file_index=total_files,
                                    overall_progress=100,
                                    stage='completed' if not was_cancelled else 'cancelled',
                                    processed_files=results)
                 
-                # 只有在成功完成时才扣除用户次数
-                if not was_cancelled:
-                    # 扣除用户批量处理次数（如果不是无限制用户）
+                # 只有在成功处理至少一个文件时才扣除用户流量
+                if not was_cancelled and actual_quota_used > 0:
+                    # 扣除用户批量处理流量（如果不是无限制用户）
                     if user_info['batchlimit'] != -1:
-                        success, new_limit = update_user_limit(user_info['id'], 'batchlimit', -1)
+                        success, new_limit = update_user_limit(user_info['id'], 'batchlimit', -actual_quota_used)
                         if success:
-                            # 记录用户操作日志（记录处理的文件大小）
-                            log_user_action(user_info['id'], 2, total_size, new_limit)
-                            logger.info(f"用户{user_info['username']}批量处理次数扣除1，剩余{new_limit}次")
+                            # 记录用户操作日志（记录处理的文件大小，单位MB）
+                            log_user_action(user_info['id'], 2, actual_quota_used, new_limit)
+                            logger.info(f"用户{user_info['username']}批量处理流量扣除{actual_quota_used:.3f}MB，剩余{new_limit:.3f}MB")
                         else:
-                            logger.error(f"用户{user_info['username']}次数扣除失败: {new_limit}")
+                            logger.error(f"用户{user_info['username']}流量扣除失败: {new_limit}")
+                    else:
+                        # 无限制用户也记录日志
+                        log_user_action(user_info['id'], 2, actual_quota_used, -1)
+                        logger.info(f"用户{user_info['username']}批量处理使用流量{actual_quota_used:.3f}MB（无限制用户）")
+                elif was_cancelled:
+                    logger.info(f"批量处理被取消，不扣除流量")
+                else:
+                    logger.info(f"批量处理无成功文件，不扣除流量")
                 
                 # 统计结果
                 successful_count = sum(1 for r in results if r['success'])
@@ -788,17 +817,18 @@ def batch_predict(user_info):
         threading.Thread(target=process_files_background, daemon=True).start()
         
         # 立即返回任务ID，供前端轮询进度
-        # 注意：这里返回的是预计的剩余次数，实际扣除在后台完成后进行
+        # 注意：这里返回的是预计的剩余流量，实际扣除在后台完成后进行
         if user_info['batchlimit'] == -1:
-            remaining_limit = -1  # 无限制
+            remaining_quota = -1  # 无限制
         else:
-            remaining_limit = user_info['batchlimit'] - 1  # 预计剩余次数
+            remaining_quota = round(max(0, user_info['batchlimit'] - required_quota), 3)  # 预计剩余流量，保留3位小数
         
         return jsonify({
             'success': True,
-            'message': '批量处理已开始',
+            'message': f'批量处理已开始，预计消耗流量 {required_quota:.3f} MB',
             'task_id': task_id,
-            'remaining_limit': remaining_limit
+            'required_quota': round(required_quota, 3),
+            'remaining_quota': remaining_quota
         })
         
     except Exception as e:

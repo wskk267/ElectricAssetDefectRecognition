@@ -72,7 +72,7 @@
             </div>
             <div class="usage-info">
               <div class="usage-bar">
-                <span class="label">剩余次数:</span>
+                <span class="label">剩余流量:</span>
                 <el-progress 
                   v-if="permissions.batchlimit !== -1"
                   :percentage="getUsagePercentage(permissions.batchlimit, permissions.batchUsed)" 
@@ -247,7 +247,7 @@ export default defineComponent({
         return '无限制'
       }
       const remaining = Math.max(0, permissions.batchlimit - (permissions.batchUsed || 0))
-      return remaining.toString()
+      return `${remaining.toFixed(3)} MB`
     })
 
     onMounted(() => {

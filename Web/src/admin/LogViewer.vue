@@ -70,7 +70,7 @@
       <el-card class="stat-card">
         <div class="stat-content">
           <div class="stat-icon">
-            <el-icon><Document /></el-icon>
+            <el-icon><Document style="color:white"/></el-icon>
           </div>
           <div class="stat-info">
             <h3>{{ logStats.total }}</h3>
@@ -82,7 +82,7 @@
       <el-card class="stat-card">
         <div class="stat-content">
           <div class="stat-icon today-logs">
-            <el-icon><Calendar /></el-icon>
+            <el-icon><Calendar style="color:white"/></el-icon>
           </div>
           <div class="stat-info">
             <h3>{{ logStats.today }}</h3>
@@ -94,7 +94,7 @@
       <el-card class="stat-card">
         <div class="stat-content">
           <div class="stat-icon active-users">
-            <el-icon><User /></el-icon>
+            <el-icon><User style="color: white"/></el-icon>
           </div>
           <div class="stat-info">
             <h3>{{ logStats.activeUsers }}</h3>
@@ -189,11 +189,11 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="处理数量" width="100">
+          <el-table-column label="处理数量" width="200">
             <template #default="scope">
               <div class="quantity-info">
                 <el-icon style="color: #67c23a; margin-right: 5px;"><Document /></el-icon>
-                <span class="quantity-text">{{ scope.row.quantity }}</span>
+                <span class="quantity-text">{{ formatQuantityByType(scope.row.class, scope.row.quantity) }}</span>
               </div>
             </template>
           </el-table-column>
@@ -202,7 +202,7 @@
               <div class="remain-info">
                 <el-icon style="color: #e6a23c; margin-right: 5px;"><Wallet /></el-icon>
                 <span class="remain-text">
-                  {{ scope.row.remain === -1 ? '无限制' : scope.row.remain }}
+                  {{ formatRemainByType(scope.row.class, scope.row.remain) }}
                 </span>
               </div>
             </template>
@@ -242,7 +242,9 @@ import {
   getOperationType, 
   getOperationName, 
   generateCSV, 
-  downloadFile 
+  downloadFile,
+  formatQuantityByType,
+  formatRemainByType
 } from '../utils/common'
 
 interface AdminLog {
@@ -442,8 +444,8 @@ export default defineComponent({
             getUserName(log.user_id),
             formatTime(log.time),
             getOperationName(log.class),
-            log.quantity,
-            log.remain === -1 ? '无限制' : log.remain
+            formatQuantityByType(log.class, log.quantity),
+            formatRemainByType(log.class, log.remain)
           ]
         }
         
@@ -492,7 +494,9 @@ export default defineComponent({
       getLogType,
       getLogAction,
       getOperationType,
-      getOperationName
+      getOperationName,
+      formatQuantityByType,
+      formatRemainByType
     }
   }
 })

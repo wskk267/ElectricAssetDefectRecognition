@@ -32,7 +32,7 @@
         />
         <small style="color: #888; font-size: 12px;">-1表示无限制</small>
       </el-form-item>
-      <el-form-item label="批量处理限额" prop="batchlimit">
+      <el-form-item label="批量处理流量(MB)" prop="batchlimit">
         <el-input-number 
           v-model="formData.batchlimit" 
           :min="-1" 
@@ -57,7 +57,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive, watch, PropType } from 'vue'
+import { defineComponent, ref, reactive, watch, PropType, computed } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 
 interface UserFormData {
@@ -103,13 +103,16 @@ export default defineComponent({
     
     const formData = reactive<UserFormData>({ ...defaultFormData })
     
-    const rules: FormRules = {
+    // 使用computed创建响应式的验证规则
+    const rules = computed<FormRules>(() => ({
       username: [
         { required: true, message: '请输入用户名', trigger: 'blur' },
         { min: 3, max: 20, message: '用户名长度在 3 到 20 个字符', trigger: 'blur' }
       ],
       password: props.isEdit 
-        ? [] 
+        ? [
+            { min: 6, message: '密码长度至少 6 个字符', trigger: 'blur' }
+          ]
         : [
             { required: true, message: '请输入密码', trigger: 'blur' },
             { min: 6, message: '密码长度至少 6 个字符', trigger: 'blur' }
@@ -120,12 +123,25 @@ export default defineComponent({
       batchlimit: [
         { required: true, message: '请设置批量处理限额', trigger: 'blur' }
       ]
-    }
+    }))
     
     // 监听用户数据变化
     watch(() => props.userData, (newData) => {
       if (newData && Object.keys(newData).length > 0) {
-        Object.assign(formData, newData)
+        // 在编辑模式下，完全使用用户数据
+        if (props.isEdit) {
+          Object.assign(formData, {
+            id: newData.id,
+            username: newData.username || '',
+            password: '', // 编辑时密码字段置空
+            imagelimit: newData.imagelimit ?? 100,
+            batchlimit: newData.batchlimit ?? 10,
+            realtimePermission: Boolean(newData.realtimePermission) // 保持用户当前的实时检测权限状态
+          })
+        } else {
+          // 创建模式下使用默认值
+          Object.assign(formData, defaultFormData)
+        }
       }
     }, { immediate: true, deep: true })
     
@@ -137,7 +153,10 @@ export default defineComponent({
     })
     
     const resetForm = () => {
-      Object.assign(formData, defaultFormData)
+      if (!props.isEdit) {
+        // 只在创建模式下重置为默认值
+        Object.assign(formData, defaultFormData)
+      }
       formRef.value?.clearValidate()
     }
     
@@ -151,7 +170,16 @@ export default defineComponent({
       
       try {
         await formRef.value.validate()
-        emit('submit', { ...formData })
+        
+        // 构造提交数据
+        const submitData = { ...formData }
+        
+        // 在编辑模式下，如果密码为空则删除密码字段
+        if (props.isEdit && !submitData.password.trim()) {
+          delete submitData.password
+        }
+        
+        emit('submit', submitData)
       } catch (error) {
         console.error('表单验证失败:', error)
       }

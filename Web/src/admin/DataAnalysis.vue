@@ -55,11 +55,11 @@
             class="activity-item"
           >
             <div class="rank">
-              <span class="rank-number" :class="user.rankClass">{{ index + 1 }}</span>
+              <span class="rank-number" :class="user.rankClass" style="color: white;">{{ index + 1 }}</span>
             </div>
             <div class="user-info">
-              <span class="username">{{ user.username }}</span>
-              <span class="activity-count">{{ user.activity }} 次操作</span>
+              <span class="username" style="color: white;">{{ user.username }}共计</span>
+              <span class="activity-count" style="color: white;">{{ user.activity }} 次操作</span>
             </div>
             <div class="progress-section">
               <el-progress 

@@ -422,9 +422,35 @@ class ImageRecognitionWorker:
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             duration = total_frames / fps if fps > 0 else 0
             
-            # 创建视频写入器
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            out = cv2.VideoWriter(temp_output_path, fourcc, fps, (width, height))
+            # 创建视频写入器 - 使用更兼容的H.264编码
+            # 尝试使用H.264编码，如果不支持则回退到mp4v
+            fourcc_options = [
+                cv2.VideoWriter_fourcc(*'H264'),  # H.264编码，最佳兼容性
+                cv2.VideoWriter_fourcc(*'avc1'),  # 另一种H.264编码
+                cv2.VideoWriter_fourcc(*'mp4v'),  # 回退选项
+                cv2.VideoWriter_fourcc(*'XVID')   # 最后的回退选项
+            ]
+            
+            out = None
+            used_fourcc = None
+            for fourcc in fourcc_options:
+                try:
+                    out = cv2.VideoWriter(temp_output_path, fourcc, fps, (width, height))
+                    if out.isOpened():
+                        used_fourcc = fourcc
+                        print(f"成功创建视频写入器，使用编码: {fourcc}")
+                        break
+                    else:
+                        out.release()
+                        out = None
+                except Exception as e:
+                    print(f"尝试编码 {fourcc} 失败: {e}")
+                    if out is not None:
+                        out.release()
+                        out = None
+            
+            if out is None:
+                raise Exception("无法创建视频写入器，请检查OpenCV视频编码支持")
             
             frame_results = []
             frame_count = 0
@@ -521,8 +547,61 @@ class ImageRecognitionWorker:
             with open(temp_output_path, 'rb') as f:
                 annotated_video_data = f.read()
             
-            # 编码为base64
-            annotated_video_base64 = base64.b64encode(annotated_video_data).decode('utf-8')
+            # 检查视频文件大小
+            video_size_mb = len(annotated_video_data) / (1024 * 1024)
+            print(f"生成的标注视频大小: {video_size_mb:.2f} MB")
+            
+            # 如果视频过大（超过50MB），尝试压缩
+            if video_size_mb > 50:
+                print("视频文件过大，尝试压缩...")
+                compressed_path = temp_output_path.replace('.mp4', '_compressed.mp4')
+                try:
+                    # 使用ffmpeg压缩视频（如果可用）
+                    import subprocess
+                    subprocess.run([
+                        'ffmpeg', '-i', temp_output_path, 
+                        '-vcodec', 'libx264', '-crf', '28', 
+                        '-preset', 'fast', '-y', compressed_path
+                    ], check=True, capture_output=True)
+                    
+                    # 检查压缩后的大小
+                    with open(compressed_path, 'rb') as f:
+                        compressed_data = f.read()
+                    compressed_size_mb = len(compressed_data) / (1024 * 1024)
+                    print(f"压缩后视频大小: {compressed_size_mb:.3f} MB")
+                    
+                    # 如果压缩后明显更小，使用压缩版本
+                    if compressed_size_mb < video_size_mb * 0.8:
+                        annotated_video_data = compressed_data
+                        print("使用压缩后的视频")
+                    else:
+                        print("压缩效果不明显，使用原视频")
+                        
+                    # 清理压缩文件
+                    try:
+                        os.unlink(compressed_path)
+                    except:
+                        pass
+                        
+                except Exception as e:
+                    print(f"视频压缩失败，使用原视频: {e}")
+            
+            # 最终大小检查
+            final_size_mb = len(annotated_video_data) / (1024 * 1024)
+            if final_size_mb > 100:  # 如果仍然超过100MB
+                print(f"警告: 视频文件过大({final_size_mb:.3f}MB)，可能影响播放性能")
+                # 可以选择不返回视频数据，只返回统计信息
+                return_video = False
+            else:
+                return_video = True
+            
+            # 编码为base64（仅当文件不太大时）
+            if return_video:
+                annotated_video_base64 = base64.b64encode(annotated_video_data).decode('utf-8')
+                print(f"视频base64编码完成，数据大小: {len(annotated_video_base64) / 1024:.1f} KB")
+            else:
+                annotated_video_base64 = None
+                print("视频文件过大，跳过base64编码")
             
             # 统计结果
             total_detections = sum(frame['detected_objects'] for frame in frame_results)
@@ -552,7 +631,7 @@ class ImageRecognitionWorker:
             print(f"  平均每关键帧: {processing_time/processed_frames:.1f}ms" if processed_frames > 0 else "")
             print(f"  检测目标总数: {total_detections}")
             
-            return {
+            result = {
                 'video_info': {
                     'duration_seconds': duration,
                     'total_frames': total_frames,
@@ -560,7 +639,8 @@ class ImageRecognitionWorker:
                     'resolution': f"{width}x{height}",
                     'processed_frames': processed_frames,
                     'frame_interval': frame_interval,
-                    'keyframes_only': True
+                    'keyframes_only': True,
+                    'file_size_mb': round(final_size_mb, 3)
                 },
                 'detection_summary': {
                     'total_detections': total_detections,
@@ -572,7 +652,6 @@ class ImageRecognitionWorker:
                 'frame_results': frame_results,
                 'processing_time_ms': processing_time,
                 'detected_objects': total_detections,
-                'annotated_video': f"data:video/mp4;base64,{annotated_video_base64}",
                 'performance_stats': {
                     'avg_keyframe_time_ms': processing_time / processed_frames if processed_frames > 0 else 0,
                     'total_inference_time_ms': sum(f.get('inference_time_ms', 0) for f in frame_results),
@@ -580,13 +659,35 @@ class ImageRecognitionWorker:
                 }
             }
             
+            # 只有在视频不太大时才返回base64数据
+            if return_video and annotated_video_base64:
+                result['annotated_video'] = f"data:video/mp4;base64,{annotated_video_base64}"
+            else:
+                result['video_too_large'] = True
+                result['video_size_mb'] = round(final_size_mb, 3)
+                # 可以提供下载链接或其他处理方式
+                
+            return result
+            
         except Exception as e:
             raise Exception(f"视频处理失败: {str(e)}")
         finally:
+            # 确保资源被正确释放
+            try:
+                if 'cap' in locals() and cap is not None:
+                    cap.release()
+            except:
+                pass
+            try:
+                if 'out' in locals() and out is not None:
+                    out.release()
+            except:
+                pass
             # 清理临时文件
             try:
-                os.unlink(temp_input_path)
-                if os.path.exists(temp_output_path):
+                if 'temp_input_path' in locals():
+                    os.unlink(temp_input_path)
+                if 'temp_output_path' in locals() and os.path.exists(temp_output_path):
                     os.unlink(temp_output_path)
             except:
                 pass

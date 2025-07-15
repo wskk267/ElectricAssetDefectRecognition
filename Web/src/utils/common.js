@@ -338,3 +338,76 @@ export function formatFileSize(bytes) {
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
+
+/**
+ * 格式化图片识别数量（显示整数）
+ * @param {number} count - 图片数量
+ * @returns {string} 格式化后的数量
+ */
+export function formatImageQuantity(count) {
+  if (count === null || count === undefined) return '0'
+  return Math.round(count).toString()
+}
+
+/**
+ * 格式化批量处理数量（显示3位小数）
+ * @param {number} amount - 批量处理量（MB）
+ * @returns {string} 格式化后的数量
+ */
+export function formatBatchQuantity(amount) {
+  if (amount === null || amount === undefined) return '0.000'
+  return Number(amount).toFixed(3)
+}
+
+/**
+ * 根据操作类型格式化数量显示
+ * @param {string|number} operationType - 操作类型
+ * @param {number} quantity - 数量值
+ * @returns {string} 格式化后的数量
+ */
+export function formatQuantityByType(operationType, quantity) {
+  const typeStr = String(operationType)
+  
+  switch (typeStr) {
+    case '1': // 图片识别
+    case '图片识别':
+      return formatImageQuantity(quantity)
+    case '2': // 批量处理
+    case '批量处理':
+      return formatBatchQuantity(quantity) + ' MB'
+    case '3': // 实时识别
+    case '实时识别':
+    case '实时检测':
+      return formatImageQuantity(quantity)
+    default:
+      return String(quantity || 0)
+  }
+}
+
+/**
+ * 根据操作类型格式化剩余额度显示
+ * @param {string|number} operationType - 操作类型
+ * @param {number} remain - 剩余额度
+ * @returns {string} 格式化后的剩余额度
+ */
+export function formatRemainByType(operationType, remain) {
+  if (remain === -1) return '无限制'
+  if (remain === null || remain === undefined) return '0'
+  
+  const typeStr = String(operationType)
+  
+  switch (typeStr) {
+    case '1': // 图片识别
+    case '图片识别':
+      return formatImageQuantity(remain)
+    case '2': // 批量处理
+    case '批量处理':
+      return formatBatchQuantity(remain) + ' MB'
+    case '3': // 实时识别
+    case '实时识别':
+    case '实时检测':
+      return formatImageQuantity(remain)
+    default:
+      return String(remain)
+  }
+}
