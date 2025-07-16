@@ -763,6 +763,7 @@ def batch_predict(user_info):
                 
                 # 计算实际使用的流量（基于成功处理的文件）
                 successful_results = [r for r in results if r['success']]
+                quota_used = 0.0  # 初始化实际使用的流量计数器
                 if successful_results:
                     # 计算成功处理文件的总大小
                     for result in successful_results:

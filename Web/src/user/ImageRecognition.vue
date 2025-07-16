@@ -27,23 +27,25 @@
 
                         <!-- 当有图片时显示预览 -->
                         <div v-else class="image-wrapper">
-                            <img :src="imagePreview" alt="预览图片" class="preview-image" ref="previewImage"
-                                @load="onImageLoad" />
+                            <div class="image-content">
+                                <img :src="imagePreview" alt="预览图片" class="preview-image" ref="previewImage"
+                                    @load="onImageLoad" />
 
-                            <!-- 边界框叠加层 -->
-                            <div v-if="showBoundingBoxes && recognitionResults.length > 0 && !detailViewActive" class="bounding-boxes-overlay">
-                                <div v-for="(result, index) in filteredResults" :key="`bbox-${result.uniqueId || result.id}-${index}`" class="bounding-box"
-                                    :style="getBboxStyle(result)" @click="showDetailedView(result)">
-                                    <!-- 标签 -->
-                                    <div class="box-label" :class="{
-                                        'label-normal': !showDefects || result.defect_status === '正常',
-                                        'label-defect': showDefects && result.defect_status === '缺陷',
-                                        'label-inside': shouldShowLabelInside(result)
-                                    }">
-                                        设备{{ result.id }}: {{ result.asset_category }}
-                                        <span v-if="showConfidence" class="confidence">
-                                            ({{ (result.confidence * 100).toFixed(1) }}%)
-                                        </span>
+                                <!-- 边界框叠加层 -->
+                                <div v-if="showBoundingBoxes && recognitionResults.length > 0 && !detailViewActive" class="bounding-boxes-overlay">
+                                    <div v-for="(result, index) in filteredResults" :key="`bbox-${result.uniqueId || result.id}-${index}`" class="bounding-box"
+                                        :style="getBboxStyle(result)" @click="showDetailedView(result)">
+                                        <!-- 标签 -->
+                                        <div class="box-label" :class="{
+                                            'label-normal': !showDefects || result.defect_status === '正常',
+                                            'label-defect': showDefects && result.defect_status === '缺陷',
+                                            'label-inside': shouldShowLabelInside(result)
+                                        }">
+                                            设备{{ result.id }}: {{ result.asset_category }}
+                                            <span v-if="showConfidence" class="confidence">
+                                                ({{ (result.confidence * 100).toFixed(1) }}%)
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -270,12 +272,31 @@ export default defineComponent({
         // 默认全选所有类别
         onMounted(() => {
             selectedCategories.value = [...assetCategories]
+            
+            // 添加窗口大小变化监听器
+            resizeListener = () => {
+                if (recognitionResults.value.length > 0) {
+                    // 防抖处理，避免频繁重新计算
+                    setTimeout(() => {
+                        updateBoundingBoxes()
+                    }, 150)
+                }
+            }
+            window.addEventListener('resize', resizeListener)
         })
 
         // 组件卸载时清理
         onUnmounted(() => {
             cleanup()
         })
+        
+        // 清理函数
+        const cleanup = () => {
+            if (resizeListener) {
+                window.removeEventListener('resize', resizeListener)
+                resizeListener = null
+            }
+        }
 
         // 根据类别和置信度过滤结果
         const filteredResults = computed(() => {
@@ -293,45 +314,41 @@ export default defineComponent({
 
         // 获取边界框样式
         const getBboxStyle = (result) => {
-            if (!previewImage.value) return {}
+            if (!previewImage.value) return { display: 'none' }
 
             const img = previewImage.value
-            const container = img.parentElement
-
-            if (!container) return {}
-
+            
             // 等待图片完全加载
             if (!img.complete || img.naturalWidth === 0) {
                 return { display: 'none' }
             }
 
-            // 获取容器和图片的实际尺寸
-            const containerRect = container.getBoundingClientRect()
-            const imgRect = img.getBoundingClientRect()
+            // 确保结果数据有效
+            if (!result || !result.center || typeof result.width !== 'number' || typeof result.height !== 'number') {
+                return { display: 'none' }
+            }
 
-            // 计算图片在容器中的实际显示尺寸和位置
-            const imgDisplayWidth = imgRect.width
-            const imgDisplayHeight = imgRect.height
+            // 新的简化方法：直接基于图片的实际显示尺寸计算
+            // 获取图片的显示尺寸
+            const imgDisplayWidth = img.offsetWidth
+            const imgDisplayHeight = img.offsetHeight
             
-            // 确保图片已正确加载并有有效尺寸
+            // 确保图片已正确渲染并有有效尺寸
             if (imgDisplayWidth === 0 || imgDisplayHeight === 0) {
                 return { display: 'none' }
             }
 
-            const imgOffsetX = (containerRect.width - imgDisplayWidth) / 2
-            const imgOffsetY = (containerRect.height - imgDisplayHeight) / 2
-
-            // 基于百分比计算边界框在图片上的位置
+            // 基于百分比直接计算边界框位置（相对于图片）
             const centerXPercent = result.center.x
             const centerYPercent = result.center.y
             const widthPercent = result.width
             const heightPercent = result.height
 
-            // 转换为在容器中的像素位置
+            // 计算边界框的尺寸和位置（相对于图片）
             const boxWidth = widthPercent * imgDisplayWidth
             const boxHeight = heightPercent * imgDisplayHeight
-            const boxLeft = imgOffsetX + (centerXPercent - widthPercent / 2) * imgDisplayWidth
-            const boxTop = imgOffsetY + (centerYPercent - heightPercent / 2) * imgDisplayHeight
+            const boxLeft = (centerXPercent - widthPercent / 2) * imgDisplayWidth
+            const boxTop = (centerYPercent - heightPercent / 2) * imgDisplayHeight
 
             // 根据缺陷状态和显示选项确定颜色
             let borderColor = '#00f5ff'  // 默认蓝色
@@ -375,15 +392,12 @@ export default defineComponent({
             if (!previewImage.value) return false
 
             const img = previewImage.value
-            const container = img.parentElement
-            if (!container) return false
-
-            const containerRect = container.getBoundingClientRect()
-            const imgRect = img.getBoundingClientRect()
-
-            // 计算图片在容器中的实际显示位置
-            const imgOffsetY = (containerRect.height - imgRect.height) / 2
-            const boxTop = imgOffsetY + (result.center.y - result.height / 2) * imgRect.height
+            const imgDisplayHeight = img.offsetHeight
+            
+            if (imgDisplayHeight === 0) return false
+            
+            // 计算边界框顶部位置
+            const boxTop = (result.center.y - result.height / 2) * imgDisplayHeight
 
             // 如果边界框太靠近顶部（距离顶部小于30px），则标签显示在内部
             return boxTop < 30
@@ -461,36 +475,37 @@ export default defineComponent({
             }
             console.log('图片加载完成，自然尺寸:', naturalImageSize.value)
 
-            // 清理之前的监听器
-            if (resizeListener) {
-                window.removeEventListener('resize', resizeListener)
-            }
-
-            // 创建新的监听器
-            resizeListener = () => {
-                updateBoundingBoxes()
-            }
-
-            // 监听窗口大小变化，重新计算边界框位置
-            window.addEventListener('resize', resizeListener)
-
             // 图片加载完成后，如果有识别结果，重新计算边界框位置
             if (recognitionResults.value.length > 0) {
-                updateBoundingBoxes()
+                setTimeout(() => {
+                    updateBoundingBoxes()
+                }, 100) // 给图片一点时间完全渲染
             }
         }
 
         // 更新边界框位置的方法
         const updateBoundingBoxes = () => {
-            // 等待DOM更新完成
+            // 确保图片完全加载
+            if (!previewImage.value || !previewImage.value.complete) {
+                setTimeout(updateBoundingBoxes, 100)
+                return
+            }
+            
+            // 等待DOM更新完成并强制重新计算
             nextTick(() => {
                 // 触发响应式更新，强制重新计算边界框位置
                 if (recognitionResults.value.length > 0) {
                     const results = [...recognitionResults.value]
                     recognitionResults.value = []
-                    setTimeout(() => {
-                        recognitionResults.value = results
-                    }, 50) // 增加延迟确保DOM更新完成
+                    
+                    // 使用requestAnimationFrame确保在下一个渲染帧执行
+                    requestAnimationFrame(() => {
+                        setTimeout(() => {
+                            recognitionResults.value = results
+                            // 再次确保图片尺寸数据正确
+                            ensureImageSize()
+                        }, 100) // 增加延迟确保布局完全稳定
+                    })
                 }
             })
         }
@@ -569,9 +584,14 @@ export default defineComponent({
                     ElMessage.success(`识别完成！检测到 ${apiData.detected_objects} 个目标，耗时 ${apiData.inference_time_ms.toFixed(1)}ms`)
                     
                     // 等待DOM更新完成后重新计算边界框位置
-                    nextTick(() => {
+                    // 使用多重等待确保布局完全稳定
+                    await nextTick()
+                    // 再等待一个动画帧，确保CSS布局完全完成
+                    await new Promise(resolve => requestAnimationFrame(resolve))
+                    // 最后等待更长时间，确保识别结果面板渲染完成
+                    setTimeout(() => {
                         updateBoundingBoxes()
-                    })
+                    }, 200)
                 } else {
                     console.error('识别失败:', result.error || result.message)
                     // 根据错误类型显示不同的消息
@@ -650,14 +670,6 @@ export default defineComponent({
             downloadFile(csvContent, filename, 'text/csv')
             
             ElMessage.success(`导出成功！共导出 ${exportData.length} 条记录`)
-        }
-
-        // 组件卸载时清理事件监听器
-        const cleanup = () => {
-            if (resizeListener) {
-                window.removeEventListener('resize', resizeListener)
-                resizeListener = null
-            }
         }
 
         return {
@@ -810,6 +822,8 @@ export default defineComponent({
     flex: 1;
     min-height: 0;
     max-height: calc(100vh - 200px);
+    /* 确保布局稳定 */
+    transition: all 0.2s ease;
 }
 
 .image-wrapper {
@@ -819,6 +833,15 @@ export default defineComponent({
     align-items: center;
     width: 100%;
     height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    /* 防止布局闪烁 */
+    contain: layout style;
+}
+
+.image-content {
+    position: relative;
+    display: inline-block;
     max-width: 100%;
     max-height: 100%;
 }
@@ -831,6 +854,8 @@ export default defineComponent({
     object-fit: contain;
     display: block;
     border-radius: 8px;
+    /* 防止图片重排导致的布局跳动 */
+    transition: none;
 }
 
 .bounding-boxes-overlay {
@@ -840,6 +865,7 @@ export default defineComponent({
     width: 100%;
     height: 100%;
     pointer-events: none;
+    z-index: 10;
 }
 
 /* 控制面板样式 */

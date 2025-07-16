@@ -477,12 +477,9 @@ export default defineComponent({
                     }
                 })
 
-                const token = localStorage.getItem('token')
-                
                 const response = await axiosInstance.post('/api/batch', formData, {
                     headers: {
-                        'Content-Type': 'multipart/form-data',
-                        'Authorization': `Bearer ${token}`
+                        'Content-Type': 'multipart/form-data'
                     },
                     timeout: 10000 // 10秒超时，因为这个API现在会立即返回
                 })
@@ -697,13 +694,8 @@ export default defineComponent({
             }
 
             try {
-                const token = localStorage.getItem('token')
                 // 调用后端取消API
-                await axiosInstance.post(`/api/cancel/${currentTaskId.value}`, {}, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                })
+                await axiosInstance.post(`/api/cancel/${currentTaskId.value}`)
                 ElMessage.info('正在取消处理，请稍候...')
             } catch (error) {
                 console.error('取消任务失败:', error)
