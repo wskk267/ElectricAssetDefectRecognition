@@ -14,6 +14,9 @@ import pymysql
 import hashlib
 import secrets
 import functools
+import asyncio
+from queue import Queue
+from concurrent.futures import ThreadPoolExecutor
 
 POOL= dbutils.PooledDB(
     creator=pymysql,
@@ -120,6 +123,13 @@ def require_auth(user_type='user'):
                     'message': '认证失败，请重新登录'
                 }), 401
             
+            # 检查账户是否被封禁
+            if user_info.get('isbannd', 0) == 1:
+                return jsonify({
+                    'success': False,
+                    'message': '您的账户已被封禁，请联系管理员'
+                }), 403
+            
             # 将用户信息传递给路由函数
             return f(user_info, *args, **kwargs)
         return decorated_function
@@ -175,12 +185,16 @@ def update_user_limit(user_id, limit_type, delta):
         return False, str(e)
 
 # 导入我们的识别服务
-from workerImage import process_image, process_video_with_annotation, process_images_batch
+from workerImage import process_image, process_video_with_annotation, process_images_batch, process_image_realtime
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__)
+# 配置中文支持
+app.config['JSON_AS_ASCII'] = False
+app.config['JSONIFY_MIMETYPE'] = 'application/json; charset=utf-8'
+
 # 配置CORS允许前端访问
 CORS(app, resources={
     r"/api/*": {
@@ -932,7 +946,8 @@ def login():
             response_data.update({
                 'imagelimit': user['imagelimit'],
                 'batchlimit': user['batchlimit'],
-                'realtimePermission': user['realtimePermission']
+                'realtimePermission': user['realtimePermission'],
+                'isbannd': user['isbannd']
             })
         
         logging.info(f"用户登录成功: {username} ({user_type})")
@@ -994,15 +1009,15 @@ def get_user_info(user_info):
     try:
         # 查询图片识别使用次数
         image_used_result = fetch_one("""
-            SELECT COUNT(*) as count FROM operation_logs 
-            WHERE user_id = %s AND operation_type = 'image_recognition'
+            SELECT COUNT(*) as count FROM user_log 
+            WHERE user_id = %s AND class = 1
         """, (user_info['id'],))
         image_used = image_used_result['count'] if image_used_result else 0
         
         # 查询批量处理使用次数
         batch_used_result = fetch_one("""
-            SELECT COUNT(*) as count FROM operation_logs 
-            WHERE user_id = %s AND operation_type = 'batch_processing'
+            SELECT COUNT(*) as count FROM user_log 
+            WHERE user_id = %s AND class = 2
         """, (user_info['id'],))
         batch_used = batch_used_result['count'] if batch_used_result else 0
         
@@ -1014,6 +1029,7 @@ def get_user_info(user_info):
                 'imagelimit': user_info['imagelimit'],
                 'batchlimit': user_info['batchlimit'],
                 'realtimePermission': user_info['realtimePermission'],
+                'isbannd': user_info['isbannd'],
                 'imageUsed': image_used,
                 'batchUsed': batch_used,
                 'update_time': user_info['update_time'].strftime('%Y-%m-%d %H:%M:%S') if user_info['update_time'] else None
@@ -1045,16 +1061,16 @@ def get_user_logs(user_info):
         total_result = fetch_one(count_sql, (user_info['id'],))
         total = total_result['total'] if total_result else 0
         
-        # 格式化日志
+        # 格式化日志 - 返回原始数据，由前端处理显示格式
         formatted_logs = []
         for log in logs:
-            action_type = {1: '图片识别', 2: '批量处理', 3: '实时检测'}.get(log['class'], '未知操作')
             formatted_logs.append({
                 'id': log['id'],
                 'time': log['time'].strftime('%Y-%m-%d %H:%M:%S'),
-                'action_type': action_type,
-                'quantity': log['quantity'],
-                'remain': log['remain']
+                'class': log['class'],  # 返回原始类别编号
+                'quantity': log['quantity'],  # 返回原始数量
+                'remain': log['remain'],  # 返回原始剩余值
+                'user_id': log['user_id']
             })
         
         return jsonify({
@@ -1253,7 +1269,7 @@ def admin_get_user_logs(admin_info, user_id):
         count_sql = "SELECT COUNT(*) as total FROM user_log WHERE user_id = %s"
         total_result = fetch_one(count_sql, (user_id,))
         total = total_result['total'] if total_result else 0
-        # 格式化日志
+        # 格式化日志 - 返回原始数据，由前端处理显示格式
         formatted_logs = []
         for log in logs:
             formatted_logs.append({
@@ -1261,9 +1277,9 @@ def admin_get_user_logs(admin_info, user_id):
                 'username': user['username'],
                 'id': log['id'],
                 'time': log['time'].strftime('%Y-%m-%d %H:%M:%S'),
-                'class': log['class'],
-                'quantity': log['quantity'],
-                'remain': log['remain']
+                'class': log['class'],  # 返回原始类别编号
+                'quantity': log['quantity'],  # 返回原始数量
+                'remain': log['remain']  # 返回原始剩余值
             })
         
         return jsonify({
@@ -1279,10 +1295,83 @@ def admin_get_user_logs(admin_info, user_id):
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@app.route('/api/realtime/detect', methods=['POST'])
+@require_auth('user')
+def realtime_detect_fast(user_info):
+    """实时检测快速接口 - 专用于实时检测，平衡性能与精度"""
+    try:
+        # 检查用户实时检测权限
+        if user_info['realtimePermission'] != 1:
+            return jsonify({'success': False, 'message': '您没有实时检测权限'}), 403
+        
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'message': '请选择要上传的文件'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'message': '未选择文件'}), 400
+        
+        if not allowed_file(file.filename):
+            return jsonify({'success': False, 'message': '不支持的文件格式'}), 400
+        
+        try:
+            # 读取图片 - 优化内存使用
+            image_data = file.read()
+            image = Image.open(io.BytesIO(image_data))
+            
+            # 确保图片是RGB格式
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+                
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'无法读取图片: {str(e)}'}), 400
+        
+        # 使用优化的实时检测函数
+        result = process_image_realtime(image)
+        
+        # 返回简化的结果格式
+        predictions = result.get('predictions', [])
+        formatted_predictions = {}
+        
+        for i, pred in enumerate(predictions):
+            # 只返回必要字段，减少传输量
+            formatted_predictions[i] = {
+                'asset_category': pred.get('asset_category', pred.get('class_name_zh', '')),
+                'defect_status': pred.get('defect_status', '正常'),
+                'confidence': round(pred.get('confidence', 0), 3),  # 减少精度
+                'center': {
+                    'x': round(pred.get('center', {}).get('x', 0), 4),
+                    'y': round(pred.get('center', {}).get('y', 0), 4)
+                },
+                'width': round(pred.get('width', 0), 4),
+                'height': round(pred.get('height', 0), 4)
+            }
+        
+        # 返回结果
+        return jsonify({
+            'success': True,
+            'data': {
+                'predictions': formatted_predictions,
+                'inference_time_ms': round(result.get('inference_time_ms', 0), 1),
+                'detected_objects': len(predictions)
+            }
+        })
+            
+    except Exception as e:
+        # 实时检测出错时不要返回错误，而是返回空结果保证流畅性
+        return jsonify({
+            'success': True,
+            'data': {
+                'predictions': {},
+                'inference_time_ms': 0,
+                'detected_objects': 0
+            }
+        })
+
 @app.route('/api/realtime', methods=['POST'])
 @require_auth('user')
 def realtime_detect(user_info):
-    """实时检测接口"""
+    """实时检测接口 - 旧版本，保留兼容性"""
     try:
         # 检查用户实时检测权限
         if user_info['realtimePermission'] != 1:
@@ -1313,8 +1402,7 @@ def realtime_detect(user_info):
         # 调用识别服务，返回带标注的图片
         result = process_image(image, return_annotated=True)
         
-        # 记录用户操作日志（实时检测不扣减次数，但记录日志）
-        log_user_action(user_info['id'], 3, 0, user_info['realtimePermission'])
+        # 实时检测不在此处记录日志，改为通过 /api/realtime/log 接口统一记录使用时长
         
         # 返回结果
         logger.info(f"实时检测完成，检测到 {result.get('detected_objects', 0)} 个目标")
@@ -1332,6 +1420,54 @@ def realtime_detect(user_info):
             'success': False,
             'message': error_msg,
             'error': str(e)
+        }), 500
+
+@app.route('/api/realtime/log', methods=['POST'])
+@require_auth('user')
+def log_realtime_usage(user_info):
+    """记录实时检测使用次数和时长"""
+    try:
+        data = request.get_json()
+        quantity = data.get('quantity', 0)  # 检测次数，默认0次
+        duration = data.get('duration', 0)  # 使用时长（秒），默认0秒
+        
+        # 检查用户是否有实时检测权限
+        if user_info['realtimePermission'] != 1:
+            return jsonify({
+                'success': False,
+                'message': '您没有实时检测权限',
+                'error_type': 'permission_denied'
+            }), 403
+        
+        # 优先记录时长，如果没有时长则记录检测次数
+        if duration > 0:
+            # 记录使用时长 (quantity存储时长，remain为-1表示无限制实时检测)
+            log_user_action(user_info['id'], 3, duration, -1)
+            logger.info(f"用户{user_info['username']}实时检测时长: {duration}秒")
+        elif quantity > 0:
+            # 记录检测次数
+            log_user_action(user_info['id'], 3, quantity, -1)
+            logger.info(f"用户{user_info['username']}实时检测: {quantity}次")
+        else:
+            # 没有有效数据时记录一次使用
+            log_user_action(user_info['id'], 3, 1, -1)
+            logger.info(f"用户{user_info['username']}实时检测: 1次")
+        
+        return jsonify({
+            'success': True,
+            'message': '使用记录已保存',
+            'data': {
+                'quantity': quantity,
+                'duration': duration,
+                'user_id': user_info['id']
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"记录实时检测使用失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '记录使用失败'
         }), 500
 
 @app.route('/api/admin/user/<int:user_id>/limits', methods=['POST'])
@@ -1658,6 +1794,60 @@ def get_all_user_logs(admin_info):
     except Exception as e:
         logging.error(f"获取用户日志失败: {str(e)}")
         return jsonify({'success': False, 'message': f'获取日志失败: {str(e)}'}), 500
+
+@app.route('/api/check-permissions', methods=['GET'])
+@require_auth('user')
+def check_user_permissions(user_info):
+    """检查用户权限接口 - 实时验证权限状态"""
+    try:
+        return jsonify({
+            'success': True,
+            'data': {
+                'realtimePermission': user_info['realtimePermission'],
+                'isbannd': user_info['isbannd'],
+                'username': user_info['username'],
+                'user_id': user_info['id']
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+# 创建专用的实时检测工作器
+class RealtimeDetectionWorker:
+    def __init__(self, model_worker):
+        self.model_worker = model_worker
+        self.executor = ThreadPoolExecutor(max_workers=2)  # 专门用于实时检测的线程池
+        self.frame_queue = Queue(maxsize=3)  # 限制队列长度，保证实时性
+        
+    def async_predict(self, image):
+        """异步预测，非阻塞"""
+        # 如果队列满了，丢弃最旧的帧
+        if self.frame_queue.full():
+            try:
+                self.frame_queue.get_nowait()
+            except:
+                pass
+        
+        future = self.executor.submit(self._predict_worker, image)
+        return future
+    
+    def _predict_worker(self, image):
+        """工作线程中的预测函数"""
+        try:
+            # 使用轻量化配置进行预测
+            result = self.model_worker.predict(image, return_annotated=False)
+            return result
+        except Exception as e:
+            print(f"实时检测预测错误: {e}")
+            return {"predictions": [], "inference_time_ms": 0, "detected_objects": 0}
+
+# 初始化实时检测工作器
+try:
+    from workerImage import worker
+    realtime_worker = RealtimeDetectionWorker(worker)
+except Exception as e:
+    print(f"初始化实时检测工作器失败: {e}")
+    realtime_worker = None
 
 if __name__ == '__main__':
     logger.info("正在启动电力资产缺陷识别API服务...")

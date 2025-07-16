@@ -361,53 +361,61 @@ export function formatBatchQuantity(amount) {
 
 /**
  * 根据操作类型格式化数量显示
- * @param {string|number} operationType - 操作类型
- * @param {number} quantity - 数量值
- * @returns {string} 格式化后的数量
+ * @param {number|string} quantity - 数量
+ * @param {number|string} operationType - 操作类型 (1=图片识别, 2=批量处理, 3=实时检测)
+ * @returns {string} 格式化后的数量字符串
  */
-export function formatQuantityByType(operationType, quantity) {
-  const typeStr = String(operationType)
+export function formatQuantityByType(quantity, operationType) {
+  const qty = Number(quantity)
+  const type = Number(operationType)
   
-  switch (typeStr) {
-    case '1': // 图片识别
-    case '图片识别':
-      return formatImageQuantity(quantity)
-    case '2': // 批量处理
-    case '批量处理':
-      return formatBatchQuantity(quantity) + ' MB'
-    case '3': // 实时识别
-    case '实时识别':
-    case '实时检测':
-      return formatImageQuantity(quantity)
+  if (isNaN(qty)) return '0'
+  
+  switch (type) {
+    case 1: // 图片识别
+    case 2: // 批量处理
+      return `${qty}张`
+    case 3: // 实时检测
+      // 如果是秒数（时长），格式化为时分秒
+      const minutes = Math.floor(qty / 60)
+      const seconds = qty % 60
+      if (minutes > 0) {
+        return seconds > 0 ? `${minutes}分${seconds}秒` : `${minutes}分钟`
+      } else {
+        return `${seconds}秒`
+      }
     default:
-      return String(quantity || 0)
+      return String(qty)
   }
 }
 
 /**
- * 根据操作类型格式化剩余额度显示
- * @param {string|number} operationType - 操作类型
- * @param {number} remain - 剩余额度
- * @returns {string} 格式化后的剩余额度
+ * 根据操作类型格式化剩余值显示
+ * @param {number|string} remain - 剩余值
+ * @param {number|string} operationType - 操作类型 (1=图片识别, 2=批量处理, 3=实时检测)
+ * @returns {string} 格式化后的剩余值字符串
  */
-export function formatRemainByType(operationType, remain) {
-  if (remain === -1) return '无限制'
-  if (remain === null || remain === undefined) return '0'
+export function formatRemainByType(remain, operationType) {
+  const remainNum = Number(remain)
+  const type = Number(operationType)
   
-  const typeStr = String(operationType)
+  // 实时检测通常是无限制的
+  if (type === 3) {
+    return '无限制'
+  }
   
-  switch (typeStr) {
-    case '1': // 图片识别
-    case '图片识别':
-      return formatImageQuantity(remain)
-    case '2': // 批量处理
-    case '批量处理':
-      return formatBatchQuantity(remain) + ' MB'
-    case '3': // 实时识别
-    case '实时识别':
-    case '实时检测':
-      return formatImageQuantity(remain)
+  // -1 表示无限制
+  if (remainNum === -1) {
+    return '无限制'
+  }
+  
+  if (isNaN(remainNum)) return '0张'
+  
+  switch (type) {
+    case 1: // 图片识别
+    case 2: // 批量处理
+      return `${remainNum}张`
     default:
-      return String(remain)
+      return String(remainNum)
   }
 }

@@ -193,7 +193,7 @@
             <template #default="scope">
               <div class="quantity-info">
                 <el-icon style="color: #67c23a; margin-right: 5px;"><Document /></el-icon>
-                <span class="quantity-text">{{ formatQuantityByType(scope.row.class, scope.row.quantity) }}</span>
+                <span class="quantity-text">{{ formatQuantityByType(scope.row.quantity, scope.row.class) }}</span>
               </div>
             </template>
           </el-table-column>
@@ -202,7 +202,7 @@
               <div class="remain-info">
                 <el-icon style="color: #e6a23c; margin-right: 5px;"><Wallet /></el-icon>
                 <span class="remain-text">
-                  {{ formatRemainByType(scope.row.class, scope.row.remain) }}
+                  {{ formatRemainByType(scope.row.remain, scope.row.class) }}
                 </span>
               </div>
             </template>
@@ -444,8 +444,8 @@ export default defineComponent({
             getUserName(log.user_id),
             formatTime(log.time),
             getOperationName(log.class),
-            formatQuantityByType(log.class, log.quantity),
-            formatRemainByType(log.class, log.remain)
+            formatQuantityByType(log.quantity, log.class),
+            formatRemainByType(log.remain, log.class)
           ]
         }
         

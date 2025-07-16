@@ -204,18 +204,36 @@ class ImageRecognitionWorker:
         
         return image
 
-    def predict(self, img, return_annotated=False):
+    def predict(self, img, return_annotated=False, realtime_mode=False):
         """
         预测图片中的目标 - 优化版本，支持批量子模型推理
         
         Args:
             img: PIL Image对象或图片路径
             return_annotated: 是否返回标注后的图片
+            realtime_mode: 是否为实时模式，影响处理策略
             
         Returns:
             dict: 预测结果
         """
         start_time = time.time()
+        
+        # 实时模式优化：动态调整图片尺寸以平衡速度和精度
+        original_img = img
+        if realtime_mode and hasattr(img, 'width') and hasattr(img, 'height'):
+            # 计算合适的尺寸：确保最长边至少640像素以保证检测效果
+            max_size = max(img.width, img.height)
+            if max_size < 640:
+                # 图片太小，不降采样
+                pass
+            elif max_size > 1024:
+                # 图片太大，适度降采样到960px
+                ratio = 960 / max_size
+                new_width = int(img.width * ratio)
+                new_height = int(img.height * ratio)
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                print(f"实时模式：图片从 {original_img.width}x{original_img.height} 调整到 {img.width}x{img.height}")
+            # 中等尺寸图片保持原样
         
         # 主模型预测
         main_start = time.time()
@@ -914,13 +932,122 @@ class ImageRecognitionWorker:
         
         return all_results
 
+    def predict_realtime(self, img, min_confidence=0.3):
+        """
+        专门为实时检测优化的预测函数
+        
+        Args:
+            img: PIL Image对象
+            min_confidence: 最小置信度阈值，低于此值的检测结果将被过滤
+            
+        Returns:
+            dict: 精简的预测结果
+        """
+        start_time = time.time()
+        
+        # 智能尺寸调整：保证检测效果的同时提高速度
+        original_size = (img.width, img.height)
+        target_img = img
+        
+        # 如果图片太小，先放大以提高检测率
+        max_dim = max(img.width, img.height)
+        min_dim = min(img.width, img.height)
+        
+        if max_dim < 480:
+            # 图片太小，放大到640
+            scale = 640 / max_dim
+            new_width = int(img.width * scale)
+            new_height = int(img.height * scale)
+            target_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            print(f"实时检测：图片从 {original_size} 放大到 {target_img.width}x{target_img.height}")
+        elif max_dim > 1280:
+            # 图片太大，适度缩小到1024以提高速度
+            scale = 1024 / max_dim
+            new_width = int(img.width * scale)
+            new_height = int(img.height * scale)
+            target_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            print(f"实时检测：图片从 {original_size} 缩小到 {target_img.width}x{target_img.height}")
+        
+        # 使用优化的推理参数
+        result = self.model1(target_img, save=False, verbose=False, 
+                           conf=min_confidence,  # 设置置信度阈值
+                           iou=0.45,  # 设置NMS阈值
+                           max_det=50)  # 限制最大检测数量
+        
+        predictions = []
+        
+        if len(result[0].boxes) == 0:
+            return {
+                "predictions": predictions,
+                "inference_time_ms": (time.time() - start_time) * 1000,
+                "detected_objects": 0,
+                "realtime_optimized": True
+            }
+        
+        # 计算缩放比例，用于坐标转换
+        scale_x = original_size[0] / target_img.width
+        scale_y = original_size[1] / target_img.height
+        
+        for i, box in enumerate(result[0].boxes):
+            confidence = box.conf[0].item()
+            
+            # 过滤低置信度结果
+            if confidence < min_confidence:
+                continue
+                
+            class_id = int(box.cls.item())
+            class_name_zh = CLASS_MAPPING_ZH.get(class_id, f"未知类别_{class_id}")
+            
+            # 获取边界框信息并转换回原始图片坐标
+            x1, y1, x2, y2 = box.xyxy[0].tolist()
+            
+            # 转换坐标到原始图片尺寸
+            x1_orig = x1 * scale_x
+            y1_orig = y1 * scale_y
+            x2_orig = x2 * scale_x
+            y2_orig = y2 * scale_y
+            
+            # 计算相对于原始图片的相对坐标
+            prediction = {
+                "center": {
+                    "x": (x1_orig + x2_orig) / 2 / original_size[0],
+                    "y": (y1_orig + y2_orig) / 2 / original_size[1]
+                },
+                "width": (x2_orig - x1_orig) / original_size[0],
+                "height": (y2_orig - y1_orig) / original_size[1],
+                "asset_category": class_name_zh,
+                "confidence": confidence,
+                "defect_status": "正常"  # 实时模式跳过子分类，假设正常
+            }
+            
+            predictions.append(prediction)
+        
+        inference_time = (time.time() - start_time) * 1000
+        
+        # 简化日志
+        if len(predictions) > 0 and inference_time > 100:  # 只在耗时较长时打印
+            print(f"实时检测: 检测到 {len(predictions)} 个目标，耗时 {inference_time:.1f}ms")
+        
+        return {
+            "predictions": predictions,
+            "inference_time_ms": inference_time,
+            "detected_objects": len(predictions),
+            "realtime_optimized": True,
+            "processed_size": f"{target_img.width}x{target_img.height}",
+            "original_size": f"{original_size[0]}x{original_size[1]}"
+        }
+
 # 全局初始化工作器
 print("初始化图像识别服务...")
 worker = ImageRecognitionWorker()
 
-def process_image(img, return_annotated=False):
+def process_image(img, return_annotated=False, realtime_mode=False):
     """对外接口函数"""
-    return worker.predict(img, return_annotated)
+    return worker.predict(img, return_annotated, realtime_mode)
+
+def process_image_realtime(img, min_confidence=0.3):
+    """实时检测专用接口函数 - 高性能优化"""
+    return worker.predict_realtime(img, min_confidence)
 
 def process_image_with_annotation(img):
     """返回带标注的图片"""

@@ -139,7 +139,8 @@ export default defineComponent({
             localStorage.setItem('userPermissions', JSON.stringify({
               imagelimit: response.data.imagelimit,
               batchlimit: response.data.batchlimit,
-              realtimePermission: response.data.realtimePermission
+              realtimePermission: response.data.realtimePermission,
+              isbannd: response.data.isbannd || 0
             }))
           }
           
