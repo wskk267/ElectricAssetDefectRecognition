@@ -298,24 +298,14 @@ class ImageRecognitionWorker:
                         pre = self.model2(cimg, save=False, verbose=False)
                         idx = crop_indices[j]
                         
-                        if len(pre[0].boxes) > 0:
-                            # 修复Tensor转换问题
-                            cls_tensor = pre[0].boxes.cls
-                            conf_tensor = pre[0].boxes.conf
+                        if hasattr(pre[0], 'probs') and pre[0].probs is not None:
+                            # 使用新的分类模型结构
+                            subclass_id = pre[0].probs.top1  # 获取top1类别ID
+                            subconfidence = pre[0].probs.top1conf.item()  # 获取置信度
                             
-                            # 检查tensor形状，确保是标量或单元素tensor
-                            if cls_tensor.numel() == 1:
-                                subclass_id = int(cls_tensor.item())
-                            else:
-                                subclass_id = int(cls_tensor[0].item())
-                            
-                            if conf_tensor.numel() == 1:
-                                subconfidence = conf_tensor.item()
-                            else:
-                                subconfidence = conf_tensor[0].item()
-                            
-                            # 根据子模型预测结果设置缺陷状态
-                            defect_status = "缺陷" if subclass_id == 1 else "正常"
+                            # 根据新模型的类别定义设置缺陷状态
+                            # 0代表defect（缺陷），1代表normal（正常）
+                            defect_status = "缺陷" if subclass_id == 0 else "正常"
                             
                             predictions[idx].update({
                                 "subclass_id": subclass_id,
@@ -823,21 +813,14 @@ class ImageRecognitionWorker:
                                 try:
                                     pre = self.model2(cimg, save=False, verbose=False)
                                     
-                                    if len(pre[0].boxes) > 0:
-                                        cls_tensor = pre[0].boxes.cls
-                                        conf_tensor = pre[0].boxes.conf
+                                    if hasattr(pre[0], 'probs') and pre[0].probs is not None:
+                                        # 使用新的分类模型结构
+                                        subclass_id = pre[0].probs.top1  # 获取top1类别ID
+                                        subconfidence = pre[0].probs.top1conf.item()  # 获取置信度
                                         
-                                        if cls_tensor.numel() == 1:
-                                            subclass_id = int(cls_tensor.item())
-                                        else:
-                                            subclass_id = int(cls_tensor[0].item())
-                                        
-                                        if conf_tensor.numel() == 1:
-                                            subconfidence = conf_tensor.item()
-                                        else:
-                                            subconfidence = conf_tensor[0].item()
-                                        
-                                        defect_status = "缺陷" if subclass_id == 1 else "正常"
+                                        # 根据新模型的类别定义设置缺陷状态
+                                        # 0代表defect（缺陷），1代表normal（正常）
+                                        defect_status = "缺陷" if subclass_id == 0 else "正常"
                                         
                                         batch_results[local_img_idx]["predictions"][pred_idx].update({
                                             "subclass_id": subclass_id,
