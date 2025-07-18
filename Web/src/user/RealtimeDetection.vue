@@ -106,6 +106,50 @@
         </div>
       </div>
 
+      <!-- 环境检查信息 -->
+      <div class="app-card" v-if="showEnvironmentInfo">
+        <div class="app-card-header">
+          <span><el-icon><InfoFilled /></el-icon> 环境信息</span>
+          <el-button size="small" @click="showEnvironmentInfo = false" type="text">
+            <el-icon><Close /></el-icon>
+          </el-button>
+        </div>
+        <div class="environment-info">
+          <div class="env-item">
+            <span class="env-label">协议:</span>
+            <span class="env-value" :class="{ 'env-error': !environmentStatus.isSecure }">
+              {{ environmentStatus.protocol }}
+            </span>
+          </div>
+          <div class="env-item">
+            <span class="env-label">主机:</span>
+            <span class="env-value">{{ environmentStatus.hostname }}</span>
+          </div>
+          <div class="env-item">
+            <span class="env-label">MediaDevices:</span>
+            <span class="env-value" :class="{ 'env-error': !environmentStatus.hasMediaDevices }">
+              {{ environmentStatus.hasMediaDevices ? '支持' : '不支持' }}
+            </span>
+          </div>
+          <div class="env-item">
+            <span class="env-label">GetUserMedia:</span>
+            <span class="env-value" :class="{ 'env-error': !environmentStatus.hasGetUserMedia }">
+              {{ environmentStatus.hasGetUserMedia ? '支持' : '不支持' }}
+            </span>
+          </div>
+          <div class="env-item">
+            <span class="env-label">EnumerateDevices:</span>
+            <span class="env-value" :class="{ 'env-error': !environmentStatus.hasEnumerateDevices }">
+              {{ environmentStatus.hasEnumerateDevices ? '支持' : '不支持' }}
+            </span>
+          </div>
+          <div class="env-item">
+            <span class="env-label">浏览器:</span>
+            <span class="env-value">{{ environmentStatus.browser }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- 检测统计 - 移除统计显示 -->
     </div>
 
@@ -192,7 +236,7 @@ import { defineComponent, ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   Monitor, VideoCamera, VideoPause, Loading, 
-  RefreshRight, Setting, Camera, Timer 
+  RefreshRight, Setting, Camera, Timer, InfoFilled, Close
 } from '@element-plus/icons-vue'
 import axiosInstance from '../axios'
 
@@ -222,7 +266,9 @@ export default defineComponent({
     RefreshRight,
     Setting,
     Camera,
-    Timer
+    Timer,
+    InfoFilled,
+    Close
   },
   setup() {
     // 检查用户权限 - 从后端实时验证
@@ -307,6 +353,25 @@ export default defineComponent({
     const maxResponseTimeHistory = 5 // 保留最近5次响应时间
     const baseDetectionInterval = ref(1000) // 基础检测间隔（毫秒）
     
+    // 环境检查状态
+    const showEnvironmentInfo = ref(false) // 是否显示环境信息
+    const environmentStatus = ref({
+      protocol: location.protocol,
+      hostname: location.hostname,
+      isSecure: location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1',
+      hasMediaDevices: !!navigator.mediaDevices,
+      hasGetUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+      hasEnumerateDevices: !!(navigator.mediaDevices && navigator.mediaDevices.enumerateDevices),
+      browser: (() => {
+        const ua = navigator.userAgent
+        if (ua.includes('Chrome')) return 'Chrome'
+        if (ua.includes('Firefox')) return 'Firefox'
+        if (ua.includes('Safari')) return 'Safari'
+        if (ua.includes('Edge')) return 'Edge'
+        return 'Unknown'
+      })()
+    })
+    
     // Canvas池管理
     const getCanvas = (): HTMLCanvasElement => {
       if (canvasPool.value.length > 0) {
@@ -326,61 +391,209 @@ export default defineComponent({
       }
     }
     
+    // 检查浏览器兼容性
+    const checkBrowserSupport = () => {
+      // 检查基本的 navigator 支持
+      if (!navigator) {
+        return {
+          supported: false,
+          reason: 'navigator API 不可用'
+        }
+      }
+
+      // 检查 mediaDevices API 支持
+      if (!navigator.mediaDevices) {
+        return {
+          supported: false,
+          reason: 'mediaDevices API 不可用（需要 HTTPS 或 localhost）'
+        }
+      }
+
+      // 检查 getUserMedia 支持
+      if (!navigator.mediaDevices.getUserMedia) {
+        return {
+          supported: false,
+          reason: 'getUserMedia API 不可用'
+        }
+      }
+
+      // 检查 enumerateDevices 支持
+      if (!navigator.mediaDevices.enumerateDevices) {
+        return {
+          supported: false,
+          reason: 'enumerateDevices API 不可用'
+        }
+      }
+
+      // 检查是否在安全上下文中
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        return {
+          supported: false,
+          reason: '摄像头访问需要 HTTPS 协议或 localhost 环境'
+        }
+      }
+
+      return {
+        supported: true,
+        reason: '浏览器支持摄像头功能'
+      }
+    }
+
     // 获取可用摄像头设备
     const getAvailableDevices = async () => {
       try {
+        // 首先检查浏览器兼容性
+        const browserCheck = checkBrowserSupport()
+        if (!browserCheck.supported) {
+          console.error('浏览器不支持摄像头功能:', browserCheck.reason)
+          ElMessage.error(`浏览器不支持: ${browserCheck.reason}`)
+          
+          // 提供解决方案提示
+          if (browserCheck.reason.includes('HTTPS')) {
+            ElMessage({
+              message: '解决方案：请使用 HTTPS 协议访问，或在 localhost 环境下使用',
+              type: 'warning',
+              duration: 8000,
+              showClose: true
+            })
+          } else if (browserCheck.reason.includes('mediaDevices')) {
+            ElMessage({
+              message: '解决方案：请更新浏览器到最新版本，或尝试使用 Chrome/Firefox 浏览器',
+              type: 'warning',
+              duration: 8000,
+              showClose: true
+            })
+          }
+          
+          return
+        }
+
+        console.log('浏览器兼容性检查通过:', browserCheck.reason)
+
         // 首先尝试获取设备列表（不需要权限）
         let devices = await navigator.mediaDevices.enumerateDevices()
         const videoDevices = devices.filter(device => device.kind === 'videoinput')
         
+        console.log('初始设备列表:', videoDevices.map(d => ({ 
+          deviceId: d.deviceId.slice(0, 8) + '...', 
+          label: d.label || '(无标签)', 
+          kind: d.kind 
+        })))
+
         // 如果设备没有标签，说明没有权限，需要请求权限
         if (videoDevices.length > 0 && !videoDevices[0].label) {
-          console.log('需要请求摄像头权限...')
+          console.log('设备列表无标签，需要请求摄像头权限...')
           try {
             // 请求摄像头权限
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true })
-            // 立即停止流，我们只是为了获取权限
-            stream.getTracks().forEach(track => track.stop())
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+              video: { 
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+              } 
+            })
+            console.log('获取权限成功，立即释放流')
             
-            // 重新获取设备列表，现在应该有标签了
+            // 立即停止流，我们只是为了获取权限
+            stream.getTracks().forEach(track => {
+              track.stop()
+              console.log('停止轨道:', track.kind, track.label)
+            })
+            
+            // 等待一小段时间后重新获取设备列表
+            await new Promise(resolve => setTimeout(resolve, 100))
             devices = await navigator.mediaDevices.enumerateDevices()
+            console.log('权限获取后的设备列表:', devices.filter(d => d.kind === 'videoinput').map(d => ({ 
+              deviceId: d.deviceId.slice(0, 8) + '...', 
+              label: d.label || '(仍无标签)', 
+              kind: d.kind 
+            })))
           } catch (permissionError) {
             console.error('摄像头权限被拒绝:', permissionError)
-            ElMessage.error('摄像头权限被拒绝，请在浏览器设置中允许摄像头访问')
+            let errorMsg = '摄像头权限被拒绝'
+            
+            if (permissionError.name === 'NotAllowedError') {
+              errorMsg = '用户拒绝了摄像头权限，请在浏览器地址栏左侧点击摄像头图标允许访问'
+            } else if (permissionError.name === 'NotFoundError') {
+              errorMsg = '未找到摄像头设备，请检查设备是否正确连接'
+            } else if (permissionError.name === 'NotReadableError') {
+              errorMsg = '摄像头被其他应用占用，请关闭其他使用摄像头的程序'
+            } else if (permissionError.name === 'SecurityError') {
+              errorMsg = '安全限制：请使用 HTTPS 协议访问本页面'
+            }
+            
+            ElMessage.error(errorMsg)
             return
           }
         }
         
-        availableDevices.value = devices
+        // 处理设备列表
+        const processedDevices = devices
           .filter(device => device.kind === 'videoinput')
-          .map(device => ({
+          .map((device, index) => ({
             deviceId: device.deviceId,
-            label: device.label || `摄像头 ${device.deviceId.slice(0, 8)}`,
+            label: device.label || `摄像头设备 ${index + 1}`,
             kind: device.kind
           }))
+
+        console.log('最终处理的设备列表:', processedDevices)
+        availableDevices.value = processedDevices
         
         // 如果有设备但没有选中任何设备，默认选择第一个
         if (availableDevices.value.length > 0 && !selectedDeviceId.value) {
           selectedDeviceId.value = availableDevices.value[0].deviceId
+          console.log('自动选择第一个设备:', selectedDeviceId.value)
         }
         
-        console.log('找到摄像头设备:', availableDevices.value)
-        
         if (availableDevices.value.length === 0) {
-          ElMessage.warning('未找到可用的摄像头设备')
+          ElMessage.warning('未找到可用的摄像头设备，请检查设备连接')
         } else {
           ElMessage.success(`找到 ${availableDevices.value.length} 个摄像头设备`)
         }
+        
       } catch (error) {
         console.error('获取摄像头设备失败:', error)
-        ElMessage.error('无法获取摄像头设备，请检查浏览器兼容性和权限设置')
+        
+        let errorMessage = '获取摄像头设备失败'
+        
+        // 根据错误类型提供具体的解决方案
+        if (error.name === 'TypeError' && error.message.includes('enumerateDevices')) {
+          errorMessage = '浏览器不支持摄像头枚举功能，请更新浏览器或使用 Chrome/Firefox'
+        } else if (error.name === 'SecurityError') {
+          errorMessage = '安全限制：请使用 HTTPS 协议或在 localhost 环境下访问'
+        } else if (error.name === 'NotSupportedError') {
+          errorMessage = '当前环境不支持摄像头功能'
+        } else {
+          errorMessage = `摄像头功能不可用: ${error.message || '未知错误'}`
+        }
+        
+        ElMessage.error(errorMessage)
+        
+        // 显示详细的解决方案
+        ElMessage({
+          message: '建议解决方案：1. 确保使用 HTTPS 协议 2. 更新浏览器到最新版本 3. 检查摄像头设备连接 4. 允许浏览器访问摄像头',
+          type: 'info',
+          duration: 10000,
+          showClose: true
+        })
       }
     }
 
     // 刷新设备列表
-    const refreshDevices = () => {
-      getAvailableDevices()
-      ElMessage.success('设备列表已刷新')
+    const refreshDevices = async () => {
+      // 检查浏览器兼容性
+      const browserCheck = checkBrowserSupport()
+      if (!browserCheck.supported) {
+        ElMessage.error(`无法刷新设备: ${browserCheck.reason}`)
+        return
+      }
+      
+      try {
+        await getAvailableDevices()
+        ElMessage.success('设备列表已刷新')
+      } catch (error) {
+        console.error('刷新设备列表失败:', error)
+        ElMessage.error('刷新设备列表失败，请检查浏览器兼容性')
+      }
     }
 
     // 解析分辨率字符串
@@ -1223,13 +1436,45 @@ export default defineComponent({
 
     // 组件挂载
     onMounted(async () => {
-      // 首先检查用户权限
+      // 首先检查浏览器兼容性
+      const browserCheck = checkBrowserSupport()
+      if (!browserCheck.supported) {
+        console.error('浏览器环境检查失败:', browserCheck.reason)
+        ElMessage.error(`当前环境不支持摄像头功能: ${browserCheck.reason}`)
+        
+        // 显示环境信息卡片，帮助用户诊断问题
+        showEnvironmentInfo.value = true
+        
+        // 提供环境信息
+        console.log('当前环境信息:', {
+          protocol: location.protocol,
+          hostname: location.hostname,
+          userAgent: navigator.userAgent,
+          hasMediaDevices: !!navigator.mediaDevices,
+          hasGetUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+          hasEnumerateDevices: !!(navigator.mediaDevices && navigator.mediaDevices.enumerateDevices)
+        })
+        
+        return // 环境不支持，停止初始化
+      }
+      
+      // 检查用户权限
       const hasPermission = await checkUserPermissions()
       if (!hasPermission) {
         return // 权限检查失败，停止初始化
       }
       
-      await getAvailableDevices()
+      // 尝试获取摄像头设备
+      try {
+        await getAvailableDevices()
+      } catch (error) {
+        console.error('初始化摄像头设备失败:', error)
+        ElMessage.error('摄像头功能初始化失败，请检查浏览器设置和设备权限')
+        // 显示环境信息，帮助用户诊断问题
+        showEnvironmentInfo.value = true
+      }
+      
+      // 注册页面卸载事件
       window.addEventListener('beforeunload', handleBeforeUnload)
     })
 
@@ -1274,6 +1519,10 @@ export default defineComponent({
       // 统计信息
       runningTime,
       formatRunningTime,
+      
+      // 环境检查
+      showEnvironmentInfo,
+      environmentStatus,
       
       // 调试功能
       debugVideoStatus
@@ -1669,6 +1918,44 @@ export default defineComponent({
   .stats-content {
     padding: 15px;
   }
+}
+
+/* 环境信息 */
+.environment-info {
+  padding: 20px;
+}
+
+.env-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 10px 0;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.env-label {
+  color: #ccc;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.env-value {
+  color: #2ed573;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.env-error {
+  color: #ff4757 !important;
+}
+
+/* 设置提示 */
+.setting-hint {
+  color: #999;
+  font-size: 12px;
+  margin-top: 8px;
+  line-height: 1.4;
 }
 
 /* 滚动条样式 */

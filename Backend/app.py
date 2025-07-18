@@ -198,7 +198,14 @@ app.config['JSONIFY_MIMETYPE'] = 'application/json; charset=utf-8'
 # 配置CORS允许前端访问
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:5173", "http://127.0.0.1:5174"],
+        "origins": [
+            "http://localhost:5173", "http://localhost:5174", 
+            "http://127.0.0.1:5173", "http://127.0.0.1:5174", 
+            "http://10.100.136.251:5173", "http://10.100.136.251:5174",
+            "https://localhost:5173", "https://localhost:5174", 
+            "https://127.0.0.1:5173", "https://127.0.0.1:5174", 
+            "https://10.100.136.251:5173", "https://10.100.136.251:5174"
+        ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     }
@@ -1864,9 +1871,16 @@ if __name__ == '__main__':
         exit(1)
     
     # 启动Flask服务
+    import ssl
+    
+    # 创建SSL上下文
+    context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+    context.load_cert_chain('cert.pem', 'key.pem')
+    
     app.run(
         host='0.0.0.0',  # 允许外部访问
         port=8090,       # 端口号（与前端配置的baseURL对应）
         debug=True,      # 开发模式
-        threaded=True    # 支持多线程
+        threaded=True,   # 支持多线程
+        ssl_context=context  # 启用HTTPS
     )
