@@ -19,25 +19,34 @@
 - **批量上传处理**：支持多种图片格式（JPG、PNG、BMP、WEBP）
 - **实时识别标注**：上传即检测，实时显示边界框和标签
 - **多目标检测**：单张图片可同时识别多个电力设备
-- **高精度识别**：基于YOLO11m模型，识别准确率达95%以上
+- **高精度识别**：基于YOLO11m模型，在测试环境中表现良好
+- **结果可视化**：在原图上绘制检测框和标签信息
 
 ### 2. 实时视频监测
-- **摄像头实时检测**：支持多种摄像头设备，实时画面分析
-- **动态频率调节**：0.1-10帧/秒可调，平衡性能与精度
-- **并发控制优化**：智能请求管理，避免服务器过载
-- **自适应性能模式**：根据设备性能自动调整检测策略
+- **摄像头实时检测**：支持浏览器内置摄像头，实时画面分析
+- **动态频率调节**：0.1-10帧/秒可调，用户可根据设备性能调整
+- **智能并发控制**：避免同时发送过多请求，保证系统稳定性
+- **性能优化模式**：提供跳帧、降采样等优化策略
+- **检测结果叠加**：在视频画面上实时显示检测框
 
-### 3. 用户权限管理
-- **多角色系统**：管理员、普通用户分级权限
-- **功能访问控制**：实时检测、批量处理等功能权限管理
-- **使用时长统计**：记录用户使用情况，支持计费管理
-- **账户状态管理**：支持账户禁用、权限调整等操作
+### 3. 批量处理功能
+- **多文件上传**：支持同时上传多个图片和视频文件
+- **进度实时跟踪**：显示处理进度和当前文件状态
+- **任务管理**：支持取消正在进行的批量任务
+- **流量计费**：基于文件大小进行用量统计
+- **结果导出**：批量下载处理结果
 
-### 4. 数据分析与管理
-- **检测历史记录**：完整的检测日志和结果存储
-- **统计分析报告**：用户使用统计、检测结果分析
-- **数据导出功能**：支持检测结果的多格式导出
-- **日志管理系统**：系统运行日志、错误追踪等
+### 4. 用户权限管理
+- **双角色系统**：管理员和普通用户角色
+- **功能权限控制**：图片识别、批量处理、实时检测权限管理
+- **使用量统计**：记录用户使用次数和时长
+- **账户状态管理**：支持账户禁用、权限调整
+
+### 5. 数据管理与统计
+- **操作日志记录**：完整记录用户操作历史
+- **使用统计报告**：管理员可查看系统使用情况
+- **权限变更日志**：记录管理员操作历史
+- **用户信息管理**：基本的用户信息查看和编辑
 
 ## � 技术架构
 
@@ -45,18 +54,15 @@
 
 #### 设备检测模型 - YOLO11m
 - **模型类型**：YOLOv11-medium 目标检测模型
-- **训练数据集**：InsPLAD (Insulator Power Line Assets Dataset)
-- **检测类别**：17种电力资产设备
-- **模型大小**：约49.7MB
-- **推理速度**：RTX 3080 约15ms/image
-- **准确率指标**：mAP@0.5 > 95%
+- **训练数据集**：基于电力设备数据集训练
+- **检测类别**：17种电力资产设备类型
+- **模型文件**：约50MB
+- **部署方式**：CPU推理，支持GPU加速
 
 #### 缺陷分类模型 - YOLO11m-cls
 - **模型类型**：YOLOv11-medium 分类模型
 - **分类任务**：二元分类（正常/缺陷）
-- **特征提取**：基于检测区域的缺陷特征分析
-- **准确率**：分类准确率 > 92%
-- **响应时间**：平均5ms/region
+- **处理流程**：先检测设备，再对检测区域进行缺陷分类
 
 ### 前端技术栈
 
@@ -75,54 +81,55 @@ Pinia 2.1+           # 状态管理
 ```
 Python 3.8+          # 编程语言
 Flask 2.3+           # 轻量级Web框架
-ultralytics 8.0+     # YOLO模型训练和推理框架
+ultralytics 8.0+     # YOLO模型推理框架
 OpenCV 4.8+          # 计算机视觉库
 Pillow 10.0+         # 图像处理库
-NumPy 1.24+          # 数值计算库
-SQLite 3             # 轻量级数据库
+PyMySQL              # MySQL数据库连接
+Flask-CORS           # 跨域请求处理
 ```
 
 ### 部署与运维
 
 ```
-Docker               # 容器化部署
-Nginx                # 反向代理服务器
-PM2                  # Node.js进程管理
-systemd              # Linux系统服务管理
+HTTPS支持           # 前后端HTTPS加密通信
+Vite开发服务器      # 前端开发环境
+Flask开发服务器     # 后端开发环境
+自签名SSL证书       # 开发环境HTTPS支持
 ```
 
-## � 数据集说明
+## 📊 数据集说明
 
-### InsPLAD数据集
-InsPLAD (Insulator Power Line Assets Dataset) 是专门为电力线路设备检测设计的高质量数据集，包含：
+### 电力设备数据集
+本系统使用电力设备相关数据集进行训练，包含：
 
-- **数据规模**：10,000+ 高分辨率图像
-- **标注质量**：专业电力工程师标注，精确的边界框和类别信息
-- **场景多样性**：覆盖不同天气、光照、角度的实际运行环境
-- **类别平衡**：17个设备类别均匀分布，避免数据偏倚
-- **缺陷样本**：包含正常和缺陷状态的设备样本
+- **覆盖设备**：17种常见电力线路设备类型
+- **图像质量**：适合目标检测任务的标注数据
+- **应用场景**：电力设备巡检和状态监测
+- **数据格式**：YOLO格式标注，支持边界框检测
 
 ### 支持的设备类别
 
-| 编号 | 英文名称 | 中文名称 | 常见缺陷类型 |
-|------|----------|----------|--------------|
-| 1 | Damper-Spiral | 螺旋阻尼器 | 脱落、断裂、位移 |
-| 2 | Damper-Stockbridge | 斯托克布里奇阻尼器 | 破损、松动 |
-| 3 | Glass Insulator | 玻璃绝缘子 | 破碎、污闪、自爆 |
-| 4 | Glass Insulator Big Shackle | 大卸扣玻璃绝缘子 | 卸扣松动、绝缘子损坏 |
-| 5 | Glass Insulator Small Shackle | 小卸扣玻璃绝缘子 | 连接松动、表面污损 |
-| 6 | Glass Insulator Tower Shackle | 塔用卸扣玻璃绝缘子 | 固定松动、绝缘失效 |
-| 7 | Lightning Rod Shackle | 避雷针卸扣 | 连接松动、腐蚀 |
-| 8 | Lightning Rod Suspension | 避雷针悬挂 | 悬挂松动、导线断裂 |
-| 9 | Tower ID Plate | 塔身标识牌 | 脱落、污损、不清晰 |
-| 10 | Polymer Insulator | 聚合物绝缘子 | 老化、污闪、机械损伤 |
-| 11 | Polymer Insulator Lower Shackle | 聚合物绝缘子下卸扣 | 连接松动、腐蚀 |
-| 12 | Polymer Insulator Upper Shackle | 聚合物绝缘子上卸扣 | 固定松动、磨损 |
-| 13 | Polymer Insulator Tower Shackle | 聚合物绝缘子塔用卸扣 | 安装不当、材料老化 |
-| 14 | Spacer | 间隔棒 | 脱落、断裂、位移 |
-| 15 | Vari-grip | 防振锤 | 脱落、断裂、效果失效 |
-| 16 | Yoke | 横担 | 变形、腐蚀、连接松动 |
-| 17 | Yoke Suspension | 横担悬挂 | 悬挂点松动、承力异常 |
+系统能够识别以下17种电力设备类型：
+
+| 编号 | 英文名称 | 中文名称 |
+|------|----------|----------|
+| 1 | Damper-Spiral | 螺旋阻尼器 |
+| 2 | Damper-Stockbridge | 斯托克布里奇阻尼器 |
+| 3 | Glass Insulator | 玻璃绝缘子 |
+| 4 | Glass Insulator Big Shackle | 大卸扣玻璃绝缘子 |
+| 5 | Glass Insulator Small Shackle | 小卸扣玻璃绝缘子 |
+| 6 | Glass Insulator Tower Shackle | 塔用卸扣玻璃绝缘子 |
+| 7 | Lightning Rod Shackle | 避雷针卸扣 |
+| 8 | Lightning Rod Suspension | 避雷针悬挂 |
+| 9 | Tower ID Plate | 塔身标识牌 |
+| 10 | Polymer Insulator | 聚合物绝缘子 |
+| 11 | Polymer Insulator Lower Shackle | 聚合物绝缘子下卸扣 |
+| 12 | Polymer Insulator Upper Shackle | 聚合物绝缘子上卸扣 |
+| 13 | Polymer Insulator Tower Shackle | 聚合物绝缘子塔用卸扣 |
+| 14 | Spacer | 间隔棒 |
+| 15 | Vari-grip | 防振锤 |
+| 16 | Yoke | 横担 |
+| 17 | Yoke Suspension | 横担悬挂 |
 
 ## �️ 系统流程
 
@@ -145,49 +152,66 @@ graph TD
 
 ```mermaid
 graph TD
-    A[启动摄像头] --> B[权限验证]
-    B --> C[视频流初始化]
+    A[启动摄像头] --> B[浏览器权限请求]
+    B --> C[摄像头流初始化]
     C --> D[开始实时检测]
     D --> E[帧提取与预处理]
-    E --> F[模型推理]
-    F --> G[结果渲染]
-    G --> H{继续检测?}
-    H -->|是| E
-    H -->|否| I[停止检测并记录]
+    E --> F[发送到后端]
+    F --> G[模型推理]
+    G --> H[返回检测结果]
+    H --> I[前端绘制检测框]
+    I --> J{继续检测?}
+    J -->|是| E
+    J -->|否| K[停止检测并记录时长]
 ```
 
-### 3. 用户管理流程
+### 3. 批量处理流程
 
 ```mermaid
 graph TD
-    A[用户注册/登录] --> B[权限验证]
-    B --> C[功能访问控制]
-    C --> D[使用行为记录]
-    D --> E[时长统计]
-    E --> F[权限续期检查]
+    A[选择多个文件] --> B[文件格式验证]
+    B --> C[计算所需流量]
+    C --> D[检查用户配额]
+    D --> E[创建后台任务]
+    E --> F[逐个处理文件]
+    F --> G[更新处理进度]
+    G --> H[返回处理结果]
+    H --> I[扣除用户配额]
 ```
 
 ## 🎨 界面展示
 
-### 主要功能模块
+### 主要功能界面
 
 1. **图片识别界面**
-   - 拖拽上传区域
-   - 实时识别结果显示
-   - 置信度和类别筛选
-   - 边界框可视化
+   - 文件上传区域（支持拖拽）
+   - 检测结果实时显示
+   - 检测框和标签可视化
+   - 置信度信息显示
 
 2. **实时检测界面**
    - 摄像头设备选择
-   - 检测频率动态调节
-   - 性能模式切换
-   - 实时状态监控
+   - 检测频率手动调节
+   - 性能模式开关
+   - 实时检测框叠加显示
+   - 检测统计信息
 
-3. **管理后台界面**
-   - 用户权限管理
+3. **批量处理界面**
+   - 多文件选择上传
+   - 实时进度条显示
+   - 任务管理（暂停/取消）
+   - 处理结果下载
+
+4. **管理后台界面**
+   - 用户列表管理
+   - 权限设置界面
+   - 操作日志查看
    - 系统使用统计
-   - 日志查看分析
-   - 数据导出功能
+
+5. **用户中心界面**
+   - 个人信息显示
+   - 使用量统计
+   - 操作历史记录
 
 ## 🚀 快速开始
 
@@ -196,13 +220,14 @@ graph TD
 ```bash
 # 系统要求
 OS: Windows 10/11, Linux, macOS
-RAM: 8GB+ (推荐16GB+)
-GPU: NVIDIA GTX 1060+ (可选，用于加速推理)
+RAM: 4GB+ (推荐8GB+)
+网络: 支持HTTPS的现代浏览器
 
 # 软件依赖
 Python: 3.8-3.11
 Node.js: 16.0+
 Git: 2.0+
+MySQL: 5.7+ (用于数据存储)
 ```
 
 ### 安装部署
@@ -233,21 +258,35 @@ npm install
 yarn install
 ```
 
-4. **启动服务**
+4. **配置数据库**
+```bash
+# 配置MySQL数据库连接
+# 在Backend/app.py中修改数据库配置
+POOL = dbutils.PooledDB(
+    creator=pymysql,
+    host='localhost',
+    port=3306,
+    user='your_username',
+    password='your_password',
+    database='ead'
+)
+```
+
+5. **启动服务**
 ```bash
 # 启动后端 (端口: 8090)
 cd Backend
 python app.py
 
-# 启动前端 (端口: 5174)
+# 启动前端 (端口: 5173)
 cd Web
 npm run dev
 ```
 
-5. **访问系统**
-- 前端界面：http://localhost:5173
-- 后端API：http://localhost:8090
-- 用户登录：admin/admin123 (默认管理员账户)
+6. **访问系统**
+- 前端界面：https://localhost:5173 (开发环境使用HTTPS)
+- 后端API：https://localhost:8090
+- 默认测试账户：guest/guest (普通用户)
 
 ## 📡 API 接口
 
@@ -266,11 +305,21 @@ Content-Type: application/json
 ### 图片识别接口
 
 ```http
-POST /api/predict/file
+POST /api/predict
 Content-Type: multipart/form-data
 Authorization: Bearer <token>
 
 file: [图片文件]
+```
+
+### 批量处理接口
+
+```http
+POST /api/batch
+Content-Type: multipart/form-data
+Authorization: Bearer <token>
+
+files: [多个图片/视频文件]
 ```
 
 ### 实时检测接口
@@ -289,21 +338,21 @@ file: [视频帧]
 {
   "success": true,
   "data": {
-    "total_detections": 3,
-    "defect_count": 1,
+    "detected_objects": 3,
     "predictions": [
       {
         "id": 1,
-        "asset_category": "Glass Insulator",
+        "asset_category": "玻璃绝缘子",
         "defect_status": "正常",
         "confidence": 0.853,
         "center": {"x": 0.456, "y": 0.332},
         "width": 0.124,
         "height": 0.187
       }
-    ]
+    ],
+    "inference_time_ms": 250.5
   },
-  "message": "检测完成"
+  "remaining_limit": 9
 }
 ```
 
@@ -313,14 +362,13 @@ file: [视频帧]
 ElectricAssetDefectRecognition/
 ├── Backend/                    # 后端服务
 │   ├── app.py                 # Flask主应用
-│   ├── config.py              # 系统配置
 │   ├── workerImage.py         # 图像处理模块
-│   ├── models/                # AI模型目录
-│   │   ├── yolo11m.pt        # 设备检测模型
-│   │   └── yolo11m-cls.pt    # 缺陷分类模型
-│   ├── utils/                 # 工具函数
-│   ├── requirements.txt       # Python依赖
-│   └── tests/                 # 单元测试
+│   ├── best.pt                # 设备检测模型
+│   ├── last.pt                # 缺陷分类模型
+│   ├── generate_cert.py       # SSL证书生成脚本
+│   ├── cert.pem               # SSL证书文件
+│   ├── key.pem                # SSL私钥文件
+│   └── uploads/               # 临时上传目录
 ├── Web/                       # 前端应用
 │   ├── src/
 │   │   ├── user/             # 用户功能模块
@@ -333,70 +381,60 @@ ElectricAssetDefectRecognition/
 │   │   │   ├── DataAnalysis.vue        # 数据分析
 │   │   │   └── LogViewer.vue           # 日志查看
 │   │   ├── components/       # 公共组件
+│   │   │   ├── login.vue             # 登录组件
+│   │   │   ├── EnhancedTable.vue     # 表格组件
+│   │   │   └── UserFormDialog.vue    # 用户表单
 │   │   ├── router/          # 路由配置
-│   │   ├── styles/          # 样式文件
-│   │   └── utils/           # 工具函数
+│   │   ├── axios.js         # HTTP请求配置
+│   │   └── composables/     # 组合式API
 │   ├── public/              # 静态资源
 │   ├── package.json         # 前端依赖
 │   └── vite.config.js       # 构建配置
-├── docs/                    # 项目文档
-├── scripts/                 # 部署脚本
-├── docker-compose.yml       # Docker编排
-├── .gitignore              # Git忽略文件
-└── README.md               # 项目说明
+├── README.md               # 项目说明
 ```
 
-## 🧪 测试
+## 🧪 功能测试
 
-### 单元测试
-
-```bash
-# 后端测试
-cd Backend
-python -m pytest tests/
-
-# 前端测试
-cd Web
-npm run test
-```
-
-### 系统测试
+### 基础功能测试
 
 ```bash
-cd Backend
-python test_system.py
-```
+# 测试图片识别功能
+1. 访问图片识别页面
+2. 上传测试图片
+3. 查看检测结果
 
-### 性能测试
+# 测试实时检测功能  
+1. 访问实时检测页面
+2. 允许摄像头权限
+3. 开启实时检测
+4. 观察检测效果
 
-```bash
-# 模型推理性能测试
-python benchmark_model.py
-
-# API压力测试
-ab -n 1000 -c 10 http://localhost:8090/api/predict/file
+# 测试批量处理功能
+1. 访问批量处理页面
+2. 选择多个文件上传
+3. 查看处理进度
+4. 下载处理结果
 ```
 
 ## 📈 性能指标
 
 ### 模型性能
 
-| 指标 | YOLO11m检测 | YOLO11m-cls分类 |
-|------|-------------|-----------------|
-| mAP@0.5 | 95.2% | - |
-| 准确率 | - | 92.8% |
-| 推理速度(GPU) | 15ms | 5ms |
-| 推理速度(CPU) | 180ms | 25ms |
-| 模型大小 | 49.7MB | 21.3MB |
+| 指标 | YOLO11m检测 | 备注 |
+|------|-------------|------|
+| 推理速度(GPU) | ~50ms | 依硬件配置而定 |
+| 推理速度(CPU) | ~200ms | 依硬件配置而定 |
+| 模型大小 | ~50MB | YOLO11m标准模型 |
+| 支持分辨率 | 640x640 | 可调整 |
 
 ### 系统性能
 
-| 指标 | 值 |
-|------|-----|
-| 单图处理时间 | <500ms |
-| 并发用户数 | 100+ |
-| 系统可用性 | >99.5% |
-| 响应时间(P95) | <2s |
+| 指标 | 值 | 备注 |
+|------|-----|------|
+| 单图处理时间 | <1s | 包含网络传输 |
+| 支持格式 | JPG/PNG/GIF等 | 常见图片格式 |
+| 上传限制 | 16MB | 单文件大小 |
+| 并发处理 | 基础支持 | 依服务器配置 |
 
 ## 🔒 安全考虑
 
@@ -415,39 +453,56 @@ ab -n 1000 -c 10 http://localhost:8090/api/predict/file
 ### 环境配置
 
 ```python
-# Backend/config.py
+# Backend/app.py中的主要配置
 class Config:
-    # 模型配置
-    DETECTION_MODEL_PATH = 'models/yolo11m.pt'
-    CLASSIFICATION_MODEL_PATH = 'models/yolo11m-cls.pt'
+    # 模型文件路径
+    DETECTION_MODEL_PATH = 'best.pt'
     
-    # API配置
+    # 文件上传配置
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}
     
-    # 数据库配置
-    DATABASE_URL = 'sqlite:///app.db'
+    # 数据库配置 (MySQL)
+    DATABASE_CONFIG = {
+        'host': 'localhost',
+        'port': 3306,
+        'user': 'your_username', 
+        'password': 'your_password',
+        'database': 'ead'
+    }
     
-    # 安全配置
-    SECRET_KEY = 'your-secret-key'
-    JWT_EXPIRATION_DELTA = 24 * 3600  # 24小时
+    # SSL配置
+    SSL_CERT = 'cert.pem'
+    SSL_KEY = 'key.pem'
 ```
 
 ### 前端配置
 
-```typescript
-// Web/src/config.ts
-export const config = {
-  apiBaseUrl: 'http://localhost:8090',
-  uploadMaxSize: 16 * 1024 * 1024, // 16MB
-  supportedFormats: ['image/jpeg', 'image/png', 'image/gif', 'image/bmp'],
-  defaultConfidenceThreshold: 0.5,
-  realtime: {
-    maxFPS: 10,
-    minFPS: 0.1,
-    defaultFPS: 1.0
+```javascript
+// Web/src/axios.js中的配置
+import axios from 'axios'
+
+const instance = axios.create({
+  baseURL: '', // 使用代理，无需指定完整URL
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json'
   }
-}
+})
+
+// Web/vite.config.js中的代理配置
+export default defineConfig({
+  server: {
+    https: true,
+    proxy: {
+      '/api': {
+        target: 'https://localhost:8090',
+        changeOrigin: true,
+        secure: false
+      }
+    }
+  }
+})
 ```
 
 ## 🔧 故障排除
@@ -455,28 +510,28 @@ export const config = {
 ### 常见问题
 
 **Q: 模型加载失败？**
-A: 检查模型文件是否存在于正确路径，确保有足够的内存空间
+A: 检查best.pt文件是否存在于Backend目录，确保模型文件完整
 
-**Q: 实时检测卡顿？**
-A: 降低检测频率，开启性能模式，或检查网络连接
+**Q: 实时检测功能不可用？**
+A: 检查浏览器是否支持摄像头权限，确认HTTPS环境配置正确
 
-**Q: 边界框位置偏移？**
-A: 已修复边界框定位算法，确保图片完全加载后再进行检测
+**Q: 上传文件失败？**
+A: 确认文件大小不超过16MB，格式为支持的图片类型
 
-**Q: 权限验证失败？**
-A: 检查JWT token是否有效，确认用户权限设置
+**Q: HTTPS连接问题？**
+A: 使用自签名证书时，需要在浏览器中手动信任证书
 
-### 日志分析
+### 日志查看
 
 ```bash
-# 查看后端日志
-tail -f Backend/logs/app.log
+# 查看后端运行状态
+# 后端启动时会在终端显示运行日志
 
-# 查看错误日志
-grep "ERROR" Backend/logs/app.log
+# 查看前端开发服务器日志  
+# 前端启动时会在终端显示编译和请求日志
 
-# 查看前端控制台
-# 打开浏览器开发者工具 -> Console
+# 查看浏览器控制台
+# 打开浏览器开发者工具 -> Console 查看前端日志
 ```
 
 ## 🤝 贡献指南
@@ -499,10 +554,10 @@ grep "ERROR" Backend/logs/app.log
 
 ## 🙏 致谢
 
-- **InsPLAD数据集提供方**：感谢专业的电力设备数据集
-- **Ultralytics团队**：YOLO11模型框架
-- **Vue.js社区**：优秀的前端框架和生态
-- **所有贡献者**：感谢每一位参与项目的开发者
+- **Ultralytics团队**：提供优秀的YOLO11模型框架
+- **Vue.js社区**：提供现代化的前端开发框架
+- **Flask社区**：提供轻量级的Python Web框架
+- **开源社区**：提供各种优秀的开源工具和库
 
 ## 📞 联系方式
 

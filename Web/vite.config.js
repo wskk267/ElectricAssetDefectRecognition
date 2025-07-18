@@ -19,6 +19,12 @@ export default defineConfig({
     host: '0.0.0.0',  // 允许外部访问
     port: 5173,
     cors: true,
+    // 修复 HMR 在 HTTPS 下的问题
+    hmr: {
+      protocol: 'wss',  // 使用安全的 WebSocket
+      host: 'localhost',
+      port: 5173
+    },
     // 添加代理配置
     proxy: {
       '/api': {

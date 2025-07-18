@@ -373,8 +373,9 @@ export function formatQuantityByType(quantity, operationType) {
   
   switch (type) {
     case 1: // 图片识别
-    case 2: // 批量处理
       return `${qty}张`
+    case 2: // 批量处理
+      return `${qty}MB`
     case 3: // 实时检测
       // 如果是秒数（时长），格式化为时分秒
       const minutes = Math.floor(qty / 60)
@@ -413,8 +414,9 @@ export function formatRemainByType(remain, operationType) {
   
   switch (type) {
     case 1: // 图片识别
-    case 2: // 批量处理
       return `${remainNum}张`
+    case 2: // 批量处理
+      return `${remainNum}MB`
     default:
       return String(remainNum)
   }
