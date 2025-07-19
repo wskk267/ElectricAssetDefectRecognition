@@ -180,6 +180,12 @@
             <p>请先选择并开启摄像头</p>
           </div>
           
+          <!-- 帧率显示 -->
+          <div v-if="cameraActive" class="fps-display">
+            <div class="fps-value">{{ currentFps.toFixed(1) }} FPS</div>
+            <div class="fps-label">识别帧率</div>
+          </div>
+          
           <!-- 视频包装器 - 始终渲染，但根据摄像头状态显示/隐藏 -->
           <div class="video-wrapper" :class="{ 'video-hidden': !cameraActive }">
             <video 
@@ -353,6 +359,10 @@ export default defineComponent({
     const maxResponseTimeHistory = 5 // 保留最近5次响应时间
     const baseDetectionInterval = ref(1000) // 基础检测间隔（毫秒）
     
+    // 帧率计算相关
+    const recentDetectionTimes = ref<number[]>([]) // 最近10次检测完成时间
+    const currentFps = ref<number>(0) // 当前实际帧率
+    
     // 环境检查状态
     const showEnvironmentInfo = ref(false) // 是否显示环境信息
     const environmentStatus = ref({
@@ -372,6 +382,37 @@ export default defineComponent({
       })()
     })
     
+    // 计算当前帧率
+    const calculateCurrentFps = () => {
+      if (recentDetectionTimes.value.length < 2) {
+        currentFps.value = 0
+        return
+      }
+      
+      const now = Date.now()
+      // 过滤最近10秒内的检测时间
+      const validTimes = recentDetectionTimes.value.filter(time => now - time < 10000)
+      
+      if (validTimes.length < 2) {
+        currentFps.value = 0
+        return
+      }
+      
+      // 计算平均时间间隔
+      const intervals: number[] = []
+      for (let i = 1; i < validTimes.length; i++) {
+        intervals.push(validTimes[i] - validTimes[i - 1])
+      }
+      
+      if (intervals.length === 0) {
+        currentFps.value = 0
+        return
+      }
+      
+      const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length
+      currentFps.value = avgInterval > 0 ? Math.round((1000 / avgInterval) * 10) / 10 : 0
+    }
+
     // Canvas池管理
     const getCanvas = (): HTMLCanvasElement => {
       if (canvasPool.value.length > 0) {
@@ -904,6 +945,10 @@ export default defineComponent({
       detectionResults.value = []
       clearCanvas()
       
+      // 重置帧率
+      recentDetectionTimes.value = []
+      currentFps.value = 0
+      
       ElMessage.info('实时检测已停止')
     }
 
@@ -1005,6 +1050,16 @@ export default defineComponent({
             if (recentResponseTimes.value.length > 10) {
               recentResponseTimes.value.shift()
             }
+
+            // 记录检测完成时间用于计算帧率
+            recentDetectionTimes.value.push(Date.now())
+            // 只保留最近10次的检测时间
+            if (recentDetectionTimes.value.length > 10) {
+              recentDetectionTimes.value.shift()
+            }
+            
+            // 计算当前帧率
+            calculateCurrentFps()
 
             // 检查请求是否还有效（避免过期响应）
             if (requestId.value !== currentRequestId || !detectionActive.value) {
@@ -1520,6 +1575,9 @@ export default defineComponent({
       runningTime,
       formatRunningTime,
       
+      // 帧率显示
+      currentFps,
+      
       // 环境检查
       showEnvironmentInfo,
       environmentStatus,
@@ -1756,6 +1814,37 @@ export default defineComponent({
   min-height: 400px;
 }
 
+/* 帧率显示 */
+.fps-display {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid var(--primary-color);
+  border-radius: 6px;
+  padding: 8px 12px;
+  z-index: 20;
+  backdrop-filter: blur(5px);
+  min-width: 80px;
+  text-align: center;
+}
+
+.fps-value {
+  color: var(--primary-color);
+  font-size: 18px;
+  font-weight: bold;
+  line-height: 1;
+  text-shadow: 0 0 4px rgba(0, 245, 255, 0.5);
+}
+
+.fps-label {
+  color: #ccc;
+  font-size: 11px;
+  margin-top: 2px;
+  line-height: 1;
+  opacity: 0.8;
+}
+
 .video-placeholder {
   display: flex;
   flex-direction: column;
@@ -1911,6 +2000,21 @@ export default defineComponent({
   .video-container {
     min-height: 300px;
     margin: 0 10px 10px 10px;
+  }
+  
+  .fps-display {
+    top: 5px;
+    right: 5px;
+    padding: 6px 8px;
+    min-width: 60px;
+  }
+  
+  .fps-value {
+    font-size: 14px;
+  }
+  
+  .fps-label {
+    font-size: 10px;
   }
   
   .device-controls,

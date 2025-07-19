@@ -588,10 +588,6 @@ export default defineComponent({
                     await nextTick()
                     // 再等待一个动画帧，确保CSS布局完全完成
                     await new Promise(resolve => requestAnimationFrame(resolve))
-                    // 最后等待更长时间，确保识别结果面板渲染完成
-                    setTimeout(() => {
-                        updateBoundingBoxes()
-                    }, 200)
                 } else {
                     console.error('识别失败:', result.error || result.message)
                     // 根据错误类型显示不同的消息
