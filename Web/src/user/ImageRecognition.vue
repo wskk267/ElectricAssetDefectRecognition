@@ -1208,7 +1208,6 @@ export default defineComponent({
 @media (max-width: 1200px) {
     .image-recognition {
         flex-direction: column;
-        padding-top: 70px;
         height: auto;
     }
 

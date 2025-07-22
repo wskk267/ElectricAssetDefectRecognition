@@ -133,6 +133,12 @@ export default defineComponent({
     }
 
     onMounted(() => {
+      const navbar = document.querySelector('.navbar')
+      const mainContent = document.querySelector('.main-content')
+      if (navbar && mainContent) {
+        mainContent.style.marginTop = navbar.offsetHeight + 'px'
+      }
+
       username.value = localStorage.getItem('username') || '用户'
       updateActiveTab()
     })
