@@ -56,8 +56,8 @@
                 <span class="label">剩余次数:</span>
                 <el-progress 
                   v-if="permissions.imagelimit !== -1"
-                  :percentage="getUsagePercentage(permissions.imagelimit, permissions.imageUsed)" 
-                  :color="getProgressColor(permissions.imagelimit, permissions.imageUsed)"
+                  :percentage=100 
+                  :color="getProgressColor(permissions.imagelimit, 0)"
                   :show-text="false"
                 />
                 <span class="value">{{ getRemainingImageCount }}</span>
@@ -75,8 +75,8 @@
                 <span class="label">剩余流量:</span>
                 <el-progress 
                   v-if="permissions.batchlimit !== -1"
-                  :percentage="getUsagePercentage(permissions.batchlimit, permissions.batchUsed)" 
-                  :color="getProgressColor(permissions.batchlimit, permissions.batchUsed)"
+                  :percentage=100 
+                  :color="getProgressColor(permissions.batchlimit, 0)"
                   :show-text="false"
                 />
                 <span class="value">{{ getRemainingBatchCount }}</span>
@@ -238,7 +238,7 @@ export default defineComponent({
       if (permissions.imagelimit === -1) {
         return '无限制'
       }
-      const remaining = Math.max(0, permissions.imagelimit - (permissions.imageUsed || 0))
+      const remaining = Math.max(0, permissions.imagelimit)
       return remaining.toString()
     })
 
@@ -246,7 +246,7 @@ export default defineComponent({
       if (permissions.batchlimit === -1) {
         return '无限制'
       }
-      const remaining = Math.max(0, permissions.batchlimit - (permissions.batchUsed || 0))
+      const remaining = Math.max(0, permissions.batchlimit)
       return `${remaining.toFixed(3)} MB`
     })
 
@@ -256,6 +256,7 @@ export default defineComponent({
       userInfo.username = localStorage.getItem('username') || ''
       
       const storedPermissions = localStorage.getItem('userPermissions')
+      console.log('Stored Permissions:', storedPermissions)
       if (storedPermissions) {
         try {
           const parsed = JSON.parse(storedPermissions)

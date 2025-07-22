@@ -56,7 +56,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, onMounted } from 'vue'
+import { defineComponent, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { Picture, FolderOpened, User, Setting, Monitor, SwitchButton } from '@element-plus/icons-vue'
@@ -77,8 +77,23 @@ export default defineComponent({
     const router = useRouter()
     const route = useRoute()
     const activeTab = ref('image')
-    const username = ref('')
+    const username = ref(localStorage.getItem('username') || '')
+    const setMainContentMargin = () => {
+      const navbar = document.querySelector('.navbar')
+      const mainContent = document.querySelector('.main-content')
+      if (navbar && mainContent) {
+        mainContent.style.marginTop = navbar.offsetHeight + 'px'
+      }
+    }
 
+    onMounted(() => {
+      setMainContentMargin()
+      window.addEventListener('resize', setMainContentMargin)
+    })
+
+    onUnmounted(() => {
+      window.removeEventListener('resize', setMainContentMargin)
+    })
     const updateActiveTab = () => {
       const path = route.path
       if (path.includes('image-recognition')) {
@@ -132,24 +147,17 @@ export default defineComponent({
       }
     }
 
-    onMounted(() => {
-      const navbar = document.querySelector('.navbar')
-      const mainContent = document.querySelector('.main-content')
-      if (navbar && mainContent) {
-        mainContent.style.marginTop = navbar.offsetHeight + 'px'
-      }
-
-      username.value = localStorage.getItem('username') || '用户'
-      updateActiveTab()
-    })
-
     watch(() => route.path, updateActiveTab)
 
     return {
       activeTab,
       username,
       switchTab,
-      logout
+      logout,
+      setMainContentMargin,
+      updateActiveTab,
+      onMounted,
+      onUnmounted
     }
   }
 })
