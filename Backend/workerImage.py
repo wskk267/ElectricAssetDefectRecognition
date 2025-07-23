@@ -560,46 +560,13 @@ class ImageRecognitionWorker:
             print(f"生成的标注视频大小: {video_size_mb:.2f} MB")
             
             # 如果视频过大（超过50MB），尝试压缩
-            if video_size_mb > 50:
-                print("视频文件过大，尝试压缩...")
-                compressed_path = temp_output_path.replace('.mp4', '_compressed.mp4')
-                try:
-                    # 使用ffmpeg压缩视频（如果可用）
-                    import subprocess
-                    subprocess.run([
-                        'ffmpeg', '-i', temp_output_path, 
-                        '-vcodec', 'libx264', '-crf', '28', 
-                        '-preset', 'fast', '-y', compressed_path
-                    ], check=True, capture_output=True)
-                    
-                    # 检查压缩后的大小
-                    with open(compressed_path, 'rb') as f:
-                        compressed_data = f.read()
-                    compressed_size_mb = len(compressed_data) / (1024 * 1024)
-                    print(f"压缩后视频大小: {compressed_size_mb:.3f} MB")
-                    
-                    # 如果压缩后明显更小，使用压缩版本
-                    if compressed_size_mb < video_size_mb * 0.8:
-                        annotated_video_data = compressed_data
-                        print("使用压缩后的视频")
-                    else:
-                        print("压缩效果不明显，使用原视频")
-                        
-                    # 清理压缩文件
-                    try:
-                        os.unlink(compressed_path)
-                    except:
-                        pass
-                        
-                except Exception as e:
-                    print(f"视频压缩失败，使用原视频: {e}")
             
             # 最终大小检查
             final_size_mb = len(annotated_video_data) / (1024 * 1024)
             if final_size_mb > 100:  # 如果仍然超过100MB
                 print(f"警告: 视频文件过大({final_size_mb:.3f}MB)，可能影响播放性能")
                 # 可以选择不返回视频数据，只返回统计信息
-                return_video = False
+                return_video = True
             else:
                 return_video = True
             
@@ -1007,6 +974,24 @@ class ImageRecognitionWorker:
             x2_orig = x2 * scale_x
             y2_orig = y2 * scale_y
             
+            try:
+                x1_crop = max(0, min(int(x1), target_img.width))
+                y1_crop = max(0, min(int(y1), target_img.height))
+                x2_crop = max(x1_crop + 1, min(int(x2), target_img.width))
+                y2_crop = max(y1_crop + 1, min(int(y2), target_img.height))
+            
+                cimg = target_img.crop((x1_crop, y1_crop, x2_crop, y2_crop))
+            
+             # 调用子模型进行缺陷分类
+                pre = self.model2(cimg, save=False, verbose=False)
+                if hasattr(pre[0], 'probs') and pre[0].probs is not None:
+                    subclass_id = pre[0].probs.top1
+                    defect_status = "缺陷" if subclass_id == 0 else "正常"
+                else:
+                    defect_status = "正常"
+            except:
+                defect_status = "正常"
+
             # 计算相对于原始图片的相对坐标
             prediction = {
                 "center": {
@@ -1017,7 +1002,7 @@ class ImageRecognitionWorker:
                 "height": (y2_orig - y1_orig) / original_size[1],
                 "asset_category": class_name_zh,
                 "confidence": confidence,
-                "defect_status": "正常"  # 实时模式跳过子分类，假设正常
+                "defect_status": defect_status  # 实时模式跳过子分类，假设正常
             }
             
             predictions.append(prediction)

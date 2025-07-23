@@ -300,7 +300,7 @@ export default defineComponent({
           return false
         }
       } catch (error) {
-        console.error('权限检查失败:', error)
+        // console.error('权限检查失败:', error)
         if (error.response?.status === 401) {
           ElMessage.error('登录已过期，请重新登录')
         } else if (error.response?.status === 403) {
@@ -351,7 +351,7 @@ export default defineComponent({
     // 并发控制状态
     const isProcessing = ref(false) // 是否正在处理请求
     const currentAbortController = ref<AbortController | null>(null) // 当前请求的取消控制器
-    const maxConcurrentRequests = 1 // 最大并发请求数量
+    const maxConcurrentRequests = 3 // 最大并发请求数量
     const activeRequests = ref(0) // 当前活跃请求数量
     
     // 自适应频率控制
@@ -486,7 +486,7 @@ export default defineComponent({
         // 首先检查浏览器兼容性
         const browserCheck = checkBrowserSupport()
         if (!browserCheck.supported) {
-          console.error('浏览器不支持摄像头功能:', browserCheck.reason)
+          // console.error('浏览器不支持摄像头功能:', browserCheck.reason)
           ElMessage.error(`浏览器不支持: ${browserCheck.reason}`)
           
           // 提供解决方案提示
@@ -509,21 +509,21 @@ export default defineComponent({
           return
         }
 
-        console.log('浏览器兼容性检查通过:', browserCheck.reason)
+        // console.log('浏览器兼容性检查通过:', browserCheck.reason)
 
         // 首先尝试获取设备列表（不需要权限）
         let devices = await navigator.mediaDevices.enumerateDevices()
         const videoDevices = devices.filter(device => device.kind === 'videoinput')
         
-        console.log('初始设备列表:', videoDevices.map(d => ({ 
-          deviceId: d.deviceId.slice(0, 8) + '...', 
-          label: d.label || '(无标签)', 
-          kind: d.kind 
-        })))
+        // console.log('初始设备列表:', videoDevices.map(d => ({ 
+        //   deviceId: d.deviceId.slice(0, 8) + '...', 
+        //   label: d.label || '(无标签)', 
+        //   kind: d.kind 
+        // })))
 
         // 如果设备没有标签，说明没有权限，需要请求权限
         if (videoDevices.length > 0 && !videoDevices[0].label) {
-          console.log('设备列表无标签，需要请求摄像头权限...')
+          // console.log('设备列表无标签，需要请求摄像头权限...')
           try {
             // 请求摄像头权限
             const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -532,24 +532,24 @@ export default defineComponent({
                 height: { ideal: 480 }
               } 
             })
-            console.log('获取权限成功，立即释放流')
+            // console.log('获取权限成功，立即释放流')
             
             // 立即停止流，我们只是为了获取权限
             stream.getTracks().forEach(track => {
               track.stop()
-              console.log('停止轨道:', track.kind, track.label)
+              // console.log('停止轨道:', track.kind, track.label)
             })
             
             // 等待一小段时间后重新获取设备列表
             await new Promise(resolve => setTimeout(resolve, 100))
             devices = await navigator.mediaDevices.enumerateDevices()
-            console.log('权限获取后的设备列表:', devices.filter(d => d.kind === 'videoinput').map(d => ({ 
-              deviceId: d.deviceId.slice(0, 8) + '...', 
-              label: d.label || '(仍无标签)', 
-              kind: d.kind 
-            })))
+            // console.log('权限获取后的设备列表:', devices.filter(d => d.kind === 'videoinput').map(d => ({ 
+            //   deviceId: d.deviceId.slice(0, 8) + '...', 
+            //   label: d.label || '(仍无标签)', 
+            //   kind: d.kind 
+            // })))
           } catch (permissionError) {
-            console.error('摄像头权限被拒绝:', permissionError)
+            // console.error('摄像头权限被拒绝:', permissionError)
             let errorMsg = '摄像头权限被拒绝'
             
             if (permissionError.name === 'NotAllowedError') {
@@ -576,13 +576,13 @@ export default defineComponent({
             kind: device.kind
           }))
 
-        console.log('最终处理的设备列表:', processedDevices)
+        // console.log('最终处理的设备列表:', processedDevices)
         availableDevices.value = processedDevices
         
         // 如果有设备但没有选中任何设备，默认选择第一个
         if (availableDevices.value.length > 0 && !selectedDeviceId.value) {
           selectedDeviceId.value = availableDevices.value[0].deviceId
-          console.log('自动选择第一个设备:', selectedDeviceId.value)
+          // console.log('自动选择第一个设备:', selectedDeviceId.value)
         }
         
         if (availableDevices.value.length === 0) {
@@ -592,7 +592,7 @@ export default defineComponent({
         }
         
       } catch (error) {
-        console.error('获取摄像头设备失败:', error)
+        // console.error('获取摄像头设备失败:', error)
         
         let errorMessage = '获取摄像头设备失败'
         
@@ -632,7 +632,7 @@ export default defineComponent({
         await getAvailableDevices()
         ElMessage.success('设备列表已刷新')
       } catch (error) {
-        console.error('刷新设备列表失败:', error)
+        // console.error('刷新设备列表失败:', error)
         ElMessage.error('刷新设备列表失败，请检查浏览器兼容性')
       }
     }
@@ -672,18 +672,18 @@ export default defineComponent({
           audio: false
         }
 
-        console.log('请求摄像头访问，约束条件:', constraints)
+        // console.log('请求摄像头访问，约束条件:', constraints)
         const stream = await navigator.mediaDevices.getUserMedia(constraints)
         currentStream.value = stream
         
-        console.log('检查video元素:', {
-          videoElement: !!videoElement.value,
-          cameraActive: cameraActive.value,
-          stream: !!stream
-        })
+        // console.log('检查video元素:', {
+        //   videoElement: !!videoElement.value,
+        //   cameraActive: cameraActive.value,
+        //   stream: !!stream
+        // })
 
         if (videoElement.value) {
-          console.log('设置视频流到视频元素')
+          // console.log('设置视频流到视频元素')
           videoElement.value.srcObject = stream
           
           // 等待一小段时间让视频流设置完成
@@ -692,9 +692,9 @@ export default defineComponent({
           // 等待视频开始播放
           try {
             await videoElement.value.play()
-            console.log('视频开始播放')
+            // console.log('视频开始播放')
           } catch (playError) {
-            console.warn('自动播放失败，可能需要用户交互:', playError)
+            // console.warn('自动播放失败，可能需要用户交互:', playError)
             // 通常在现代浏览器中，摄像头流可以自动播放，所以这个错误可以忽略
           }
           
@@ -705,10 +705,10 @@ export default defineComponent({
           cameraStartTime.value = Date.now()
           startTimer()
           
-          console.log('摄像头启动成功, 开始时间:', new Date(cameraStartTime.value))
+          // console.log('摄像头启动成功, 开始时间:', new Date(cameraStartTime.value))
           ElMessage.success('摄像头已启动')
         } else {
-          console.error('视频元素未找到 - ref绑定失败')
+          // console.error('视频元素未找到 - ref绑定失败')
           
           // 清理流
           if (stream) {
@@ -719,7 +719,7 @@ export default defineComponent({
           ElMessage.error('视频元素初始化失败，请刷新页面重试')
         }
       } catch (error: any) {
-        console.error('启动摄像头失败:', error)
+        // console.error('启动摄像头失败:', error)
         
         let errorMessage = '启动摄像头失败'
         
@@ -799,11 +799,11 @@ export default defineComponent({
     const onVideoLoaded = () => {
       if (videoElement.value) {
         const video = videoElement.value
-        console.log('视频元数据加载完成:', {
-          videoWidth: video.videoWidth,
-          videoHeight: video.videoHeight,
-          readyState: video.readyState
-        })
+        // console.log('视频元数据加载完成:', {
+        //   videoWidth: video.videoWidth,
+        //   videoHeight: video.videoHeight,
+        //   readyState: video.readyState
+        // })
         
         videoResolution.value = `${video.videoWidth}x${video.videoHeight}`
         
@@ -814,16 +814,16 @@ export default defineComponent({
             overlayCanvas.value.width = video.videoWidth
             overlayCanvas.value.height = video.videoHeight
             
-            console.log('Canvas尺寸已设置:', {
-              canvasWidth: overlayCanvas.value.width,
-              canvasHeight: overlayCanvas.value.height,
-              videoWidth: video.videoWidth,
-              videoHeight: video.videoHeight
-            })
+            // console.log('Canvas尺寸已设置:', {
+            //   canvasWidth: overlayCanvas.value.width,
+            //   canvasHeight: overlayCanvas.value.height,
+            //   videoWidth: video.videoWidth,
+            //   videoHeight: video.videoHeight
+            // })
           }
         })
         
-        console.log('视频加载完成:', videoResolution.value)
+        // console.log('视频加载完成:', videoResolution.value)
       }
     }
 
@@ -853,7 +853,7 @@ export default defineComponent({
       
       // 开始检测计时 - 只有在开始检测时才计时
       detectionStartTime.value = Date.now()
-      console.log('开始检测计时:', new Date(detectionStartTime.value))
+      // console.log('开始检测计时:', new Date(detectionStartTime.value))
 
       // 使用动态检测频率，不使用固定定时器
       // 通过requestAnimationFrame实现更平滑的检测循环
@@ -904,21 +904,21 @@ export default defineComponent({
       // 计算检测时长并记录（只在这里记录一次）
       if (detectionStartTime.value > 0) {
         const detectionDuration = Math.floor((Date.now() - detectionStartTime.value) / 1000)
-        console.log('停止检测，检测时长:', detectionDuration, '秒')
+        // console.log('停止检测，检测时长:', detectionDuration, '秒')
         
         // 如果检测时长合理（至少5秒，避免记录极短的测试），记录到后端
         if (detectionDuration >= 5 && detectionDuration < 86400) {
           axiosInstance.post('/api/realtime/log', {
             duration: detectionDuration
           }).then(() => {
-            console.log(`检测时长已记录: ${detectionDuration}秒`)
+            // console.log(`检测时长已记录: ${detectionDuration}秒`)
           }).catch(error => {
-            console.error('记录检测时长失败:', error)
+            // console.error('记录检测时长失败:', error)
           })
         } else if (detectionDuration < 5) {
-          console.log('检测时长过短，跳过记录:', detectionDuration)
+          // console.log('检测时长过短，跳过记录:', detectionDuration)
         } else {
-          console.warn('检测时长异常，跳过记录:', detectionDuration)
+          // console.warn('检测时长异常，跳过记录:', detectionDuration)
         }
         
         // 重置检测开始时间
@@ -960,7 +960,7 @@ export default defineComponent({
 
       // 并发控制：如果已有请求在处理，跳过本次检测
       if (isProcessing.value || activeRequests.value >= maxConcurrentRequests) {
-        console.log('跳过检测：已有请求在处理中')
+        // console.log('跳过检测：已有请求在处理中')
         return
       }
 
@@ -1073,13 +1073,13 @@ export default defineComponent({
               const predictions = Object.values(result.data.predictions) as any[]
               
               // 调试：打印后端返回的原始数据
-              console.log('后端返回的检测结果:', {
-                sourceWidth,
-                sourceHeight,
-                targetWidth,
-                targetHeight,
-                predictions: predictions.slice(0, 1) // 只打印第一个结果
-              })
+              // console.log('后端返回的检测结果:', {
+              //   sourceWidth,
+              //   sourceHeight,
+              //   targetWidth,
+              //   targetHeight,
+              //   predictions: predictions.slice(0, 1) // 只打印第一个结果
+              // })
               
               // 后端返回的坐标是基于发送图片的相对坐标(0-1)
               // 直接使用这些相对坐标，在canvas上绘制时会自动缩放到canvas尺寸
@@ -1092,7 +1092,7 @@ export default defineComponent({
                   
                   // 如果坐标值异常小（小于0.01），可能是坐标计算错误，尝试修正
                   if (pred.center.x < 0.01 || pred.center.y < 0.01 || pred.width < 0.01 || pred.height < 0.01) {
-                    console.warn('检测到异常小的坐标值，尝试修正:', pred)
+                    // console.warn('检测到异常小的坐标值，尝试修正:', pred)
                     
                     // 假设这些值可能是像素坐标被错误地当作相对坐标
                     // 尝试将其转换为合理的相对坐标
@@ -1101,10 +1101,10 @@ export default defineComponent({
                     const potentialPixelW = pred.width * targetWidth
                     const potentialPixelH = pred.height * targetHeight
                     
-                    console.log('尝试像素坐标解释:', {
-                      pixelCenter: { x: potentialPixelX, y: potentialPixelY },
-                      pixelSize: { w: potentialPixelW, h: potentialPixelH }
-                    })
+                    // console.log('尝试像素坐标解释:', {
+                    //   pixelCenter: { x: potentialPixelX, y: potentialPixelY },
+                    //   pixelSize: { w: potentialPixelW, h: potentialPixelH }
+                    // })
                     
                     // 如果像素坐标看起来合理（在图片范围内），则使用
                     if (potentialPixelX > 0 && potentialPixelX < targetWidth && 
@@ -1112,7 +1112,7 @@ export default defineComponent({
                       // 保持原值，因为可能是正确的相对坐标
                     } else {
                       // 设置一个可见的测试框在图片中心
-                      console.warn('使用测试坐标')
+                      // console.warn('使用测试坐标')
                       center = { x: 0.5, y: 0.5 }
                       width = 0.2
                       height = 0.2
@@ -1131,28 +1131,28 @@ export default defineComponent({
                   }
                   
                   // 详细调试信息
-                  console.log(`检测框 ${index + 1} 详细信息:`, {
-                    后端原始: {
-                      center: pred.center,
-                      size: { w: pred.width, h: pred.height }
-                    },
-                    最终使用: {
-                      center: result.center,
-                      size: { w: result.width, h: result.height }
-                    },
-                    转换为像素坐标: {
-                      centerX: result.center.x * sourceWidth,
-                      centerY: result.center.y * sourceHeight,
-                      width: result.width * sourceWidth,
-                      height: result.height * sourceHeight
-                    }
-                  })
+                  // console.log(`检测框 ${index + 1} 详细信息:`, {
+                  //   后端原始: {
+                  //     center: pred.center,
+                  //     size: { w: pred.width, h: pred.height }
+                  //   },
+                  //   最终使用: {
+                  //     center: result.center,
+                  //     size: { w: result.width, h: result.height }
+                  //   },
+                  //   转换为像素坐标: {
+                  //     centerX: result.center.x * sourceWidth,
+                  //     centerY: result.center.y * sourceHeight,
+                  //     width: result.width * sourceWidth,
+                  //     height: result.height * sourceHeight
+                  //   }
+                  // })
                   
                   return result
                 })
 
               // 调试：打印转换后的结果
-              console.log('转换后的检测结果:', filteredResults.slice(0, 2))
+              // console.log('转换后的检测结果:', filteredResults.slice(0, 2))
 
               detectionResults.value = filteredResults
               
@@ -1175,14 +1175,14 @@ export default defineComponent({
           } catch (error) {
             // 检查是否是取消的请求
             if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-              console.log('检测请求被取消')
+              // console.log('检测请求被取消')
               returnCanvas(canvas)
               return
             }
             
             // 检查是否是超时错误
             if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-              console.warn('检测请求超时，可能服务器负载过高')
+              // console.warn('检测请求超时，可能服务器负载过高')
               // 超时时适当降低检测频率
               if (performanceMode.value) {
                 frameSkipCount.value = Math.min(5, frameSkipCount.value + 3)
@@ -1192,7 +1192,7 @@ export default defineComponent({
               if (performanceMode.value) {
                 frameSkipCount.value = Math.min(3, frameSkipCount.value + 2)
               }
-              console.error('检测失败:', error)
+              // console.error('检测失败:', error)
             }
           } finally {
             returnCanvas(canvas)
@@ -1204,7 +1204,7 @@ export default defineComponent({
         }, 'image/jpeg', 0.7) // 提高图片质量，减少因压缩导致的检测精度损失
         
       } catch (error) {
-        console.error('检测过程出错:', error)
+        // console.error('检测过程出错:', error)
         // 确保状态重置
         isProcessing.value = false
         activeRequests.value = Math.max(0, activeRequests.value - 1)
@@ -1227,20 +1227,20 @@ export default defineComponent({
       if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
         canvas.width = video.videoWidth
         canvas.height = video.videoHeight
-        console.log('Canvas尺寸已更新:', { width: canvas.width, height: canvas.height })
+        // console.log('Canvas尺寸已更新:', { width: canvas.width, height: canvas.height })
       }
 
       // 如果没有检测结果，直接返回
       if (results.length === 0) return
 
       // 调试：打印绘制信息
-      console.log('绘制检测框:', {
-        canvasWidth: canvas.width,
-        canvasHeight: canvas.height,
-        videoWidth: video.videoWidth,
-        videoHeight: video.videoHeight,
-        resultsCount: results.length
-      })
+      // console.log('绘制检测框:', {
+      //   canvasWidth: canvas.width,
+      //   canvasHeight: canvas.height,
+      //   videoWidth: video.videoWidth,
+      //   videoHeight: video.videoHeight,
+      //   resultsCount: results.length
+      // })
 
       results.forEach((result, index) => {
         // 计算边界框位置 - 使用canvas的实际尺寸
@@ -1253,11 +1253,11 @@ export default defineComponent({
 
         // 调试：打印每个框的坐标
         if (index === 0) { // 只打印第一个框的信息以减少日志
-          console.log('绘制框坐标:', {
-            center: result.center,
-            size: { width: result.width, height: result.height },
-            canvasCoords: { centerX, centerY, boxWidth, boxHeight, x, y }
-          })
+          // console.log('绘制框坐标:', {
+          //   center: result.center,
+          //   size: { width: result.width, height: result.height },
+          //   canvasCoords: { centerX, centerY, boxWidth, boxHeight, x, y }
+          // })
         }
 
         // 设置颜色
@@ -1380,7 +1380,7 @@ export default defineComponent({
         recording.value = true
         ElMessage.success('开始录制')
       } catch (error) {
-        console.error('开始录制失败:', error)
+        // console.error('开始录制失败:', error)
         ElMessage.error('录制功能不可用')
       }
     }
@@ -1443,49 +1443,49 @@ export default defineComponent({
     const debugVideoStatus = () => {
       if (videoElement.value) {
         const video = videoElement.value
-        console.log('视频元素状态检查:', {
-          srcObject: !!video.srcObject,
-          currentSrc: video.currentSrc,
-          videoWidth: video.videoWidth,
-          videoHeight: video.videoHeight,
-          readyState: video.readyState,
-          networkState: video.networkState,
-          paused: video.paused,
-          ended: video.ended,
-          muted: video.muted,
-          autoplay: video.autoplay,
-          playsinline: video.getAttribute('playsinline'),
-          style: {
-            display: video.style.display,
-            visibility: video.style.visibility,
-            width: video.style.width,
-            height: video.style.height
-          },
-          computedStyle: {
-            display: getComputedStyle(video).display,
-            visibility: getComputedStyle(video).visibility,
-            width: getComputedStyle(video).width,
-            height: getComputedStyle(video).height
-          }
-        })
+        // console.log('视频元素状态检查:', {
+        //   srcObject: !!video.srcObject,
+        //   currentSrc: video.currentSrc,
+        //   videoWidth: video.videoWidth,
+        //   videoHeight: video.videoHeight,
+        //   readyState: video.readyState,
+        //   networkState: video.networkState,
+        //   paused: video.paused,
+        //   ended: video.ended,
+        //   muted: video.muted,
+        //   autoplay: video.autoplay,
+        //   playsinline: video.getAttribute('playsinline'),
+        //   style: {
+        //     display: video.style.display,
+        //     visibility: video.style.visibility,
+        //     width: video.style.width,
+        //     height: video.style.height
+        //   },
+        //   computedStyle: {
+        //     display: getComputedStyle(video).display,
+        //     visibility: getComputedStyle(video).visibility,
+        //     width: getComputedStyle(video).width,
+        //     height: getComputedStyle(video).height
+        //   }
+        // })
         
         // 检查流的状态
         if (currentStream.value) {
           const tracks = currentStream.value.getVideoTracks()
-          console.log('视频流状态:', {
-            active: currentStream.value.active,
-            id: currentStream.value.id,
-            tracks: tracks.map(track => ({
-              enabled: track.enabled,
-              muted: track.muted,
-              readyState: track.readyState,
-              kind: track.kind,
-              label: track.label
-            }))
-          })
+          // console.log('视频流状态:', {
+          //   active: currentStream.value.active,
+          //   id: currentStream.value.id,
+          //   tracks: tracks.map(track => ({
+          //     enabled: track.enabled,
+          //     muted: track.muted,
+          //     readyState: track.readyState,
+          //     kind: track.kind,
+          //     label: track.label
+          //   }))
+          // })
         }
       } else {
-        console.log('视频元素不存在!')
+        // console.log('视频元素不存在!')
       }
     }
 
@@ -1494,21 +1494,21 @@ export default defineComponent({
       // 首先检查浏览器兼容性
       const browserCheck = checkBrowserSupport()
       if (!browserCheck.supported) {
-        console.error('浏览器环境检查失败:', browserCheck.reason)
+        // console.error('浏览器环境检查失败:', browserCheck.reason)
         ElMessage.error(`当前环境不支持摄像头功能: ${browserCheck.reason}`)
         
         // 显示环境信息卡片，帮助用户诊断问题
         showEnvironmentInfo.value = true
         
         // 提供环境信息
-        console.log('当前环境信息:', {
-          protocol: location.protocol,
-          hostname: location.hostname,
-          userAgent: navigator.userAgent,
-          hasMediaDevices: !!navigator.mediaDevices,
-          hasGetUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
-          hasEnumerateDevices: !!(navigator.mediaDevices && navigator.mediaDevices.enumerateDevices)
-        })
+        // console.log('当前环境信息:', {
+        //   protocol: location.protocol,
+        //   hostname: location.hostname,
+        //   userAgent: navigator.userAgent,
+        //   hasMediaDevices: !!navigator.mediaDevices,
+        //   hasGetUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+        //   hasEnumerateDevices: !!(navigator.mediaDevices && navigator.mediaDevices.enumerateDevices)
+        // })
         
         return // 环境不支持，停止初始化
       }
@@ -1523,7 +1523,7 @@ export default defineComponent({
       try {
         await getAvailableDevices()
       } catch (error) {
-        console.error('初始化摄像头设备失败:', error)
+        // console.error('初始化摄像头设备失败:', error)
         ElMessage.error('摄像头功能初始化失败，请检查浏览器设置和设备权限')
         // 显示环境信息，帮助用户诊断问题
         showEnvironmentInfo.value = true

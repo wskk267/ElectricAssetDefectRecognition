@@ -28,7 +28,7 @@ export default defineConfig({
     // 添加代理配置
     proxy: {
       '/api': {
-        target: 'https://10.250.1.63:8090',
+        target: 'https://10.100.136.251:8090',
         changeOrigin: true,
         secure: false, // 忽略证书验证
         configure: (proxy, options) => {

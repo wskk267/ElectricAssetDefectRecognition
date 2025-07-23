@@ -23,7 +23,7 @@ def generate_self_signed_cert():
         x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "State"),
         x509.NameAttribute(NameOID.LOCALITY_NAME, "City"),
         x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Electric Asset Defect Recognition"),
-        x509.NameAttribute(NameOID.COMMON_NAME, "10.250.1.63"),
+        x509.NameAttribute(NameOID.COMMON_NAME, "10.100.136.251"),
     ])
 
     # 创建证书
@@ -44,7 +44,7 @@ def generate_self_signed_cert():
             x509.DNSName("localhost"),
             x509.DNSName("127.0.0.1"),
             x509.IPAddress(ipaddress.ip_address("127.0.0.1")),
-            x509.IPAddress(ipaddress.ip_address("10.250.1.63")),
+            x509.IPAddress(ipaddress.ip_address("10.100.136.251")),
         ]),
         critical=False,
     ).sign(private_key, hashes.SHA256())
