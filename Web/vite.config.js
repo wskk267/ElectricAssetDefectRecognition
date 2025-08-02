@@ -22,7 +22,7 @@ export default defineConfig({
     // 修复 HMR 在 HTTPS 下的问题
     hmr: {
       protocol: 'wss',  // 使用安全的 WebSocket
-      host: 'localhost',
+      host: '10.100.136.251',
       port: 5173
     },
     // 添加代理配置

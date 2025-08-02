@@ -457,6 +457,38 @@ export default defineComponent({
                 return
             }
 
+            // 检查是否有正在进行的任务
+            if (currentTaskId.value) {
+                try {
+                    const checkResponse = await axiosInstance.get(`/api/progress/${currentTaskId.value}`)
+                    if (checkResponse.data.success) {
+                        const result = await ElMessageBox.confirm(
+                          '检测到有正在进行的任务，是否继续监控该任务？',
+                          '任务状态确认',
+                          {
+                            confirmButtonText: '继续监控',
+                            cancelButtonText: '开始新任务',
+                            type: 'warning',
+                          }
+                        )
+                        
+                        if (result) {
+                          // 继续监控现有任务
+                          processing.value = true
+                          startProgressPolling()
+                          startTimer()
+                          return
+                        } else {
+                          // 取消现有任务，开始新任务
+                          await cancelProcessing()
+                        }
+                    }
+                } catch (error) {
+                  console.log('没有正在进行的任务，开始新任务')
+                  currentTaskId.value = null
+                }
+            }
+
             processing.value = true
             processedFiles.value = []
             completedCount.value = 0
@@ -471,17 +503,35 @@ export default defineComponent({
                 const formData = new FormData()
                 
                 // 添加所有文件到FormData
-                fileList.value.forEach(uploadFile => {
+                console.log('开始准备文件上传，文件列表:', fileList.value)
+                fileList.value.forEach((uploadFile, index) => {
                     if (uploadFile.raw) {
+                        console.log(`添加文件 ${index + 1}: ${uploadFile.name}, 大小: ${uploadFile.size}, 类型: ${uploadFile.raw.type}`)
                         formData.append('files', uploadFile.raw)
+                    } else {
+                        console.warn(`文件 ${index + 1} (${uploadFile.name}) 没有 raw 属性`)
                     }
                 })
 
+                // 验证FormData是否包含文件
+                let fileCount = 0
+                for (let pair of formData.entries()) {
+                    if (pair[0] === 'files') {
+                        fileCount++
+                        const file = pair[1] as File
+                        console.log(`FormData中的文件: ${file.name}, 大小: ${file.size}`)
+                    }
+                }
+                
+                if (fileCount === 0) {
+                    throw new Error('没有有效的文件可上传')
+                }
+
+                console.log(`准备上传 ${fileCount} 个文件`)
+
                 const response = await axiosInstance.post('/api/batch', formData, {
-                    headers: {
-                        'Content-Type': 'multipart/form-data'
-                    },
-                    timeout: 10000 // 10秒超时，因为这个API现在会立即返回
+                    // 不要手动设置 Content-Type，让浏览器自动设置 multipart/form-data 的边界
+                    timeout: 30000 // 增加超时时间到30秒
                 })
 
                 const batchResult = response.data
@@ -501,14 +551,31 @@ export default defineComponent({
             } catch (error) {
                 console.error('批量处理失败:', error)
                 
+                // 详细的错误诊断
+                if (error.response) {
+                    console.error('HTTP错误状态:', error.response.status)
+                    console.error('错误响应数据:', error.response.data)
+                    console.error('错误响应头:', error.response.headers)
+                } else if (error.request) {
+                    console.error('请求错误:', error.request)
+                } else {
+                    console.error('其他错误:', error.message)
+                }
+                
                 // 检查是否是 HTTP 错误
                 if (error.response && error.response.data) {
                     const errorData = error.response.data
                     if (errorData.error_type === 'quota_exceeded') {
                         ElMessage.error(`批量处理流量不足！${errorData.message}`)
+                    } else if (error.response.status === 400) {
+                        ElMessage.error('请求格式错误，请检查文件类型和大小')
+                    } else if (error.response.status === 413) {
+                        ElMessage.error('文件过大，请减少文件数量或大小')
                     } else {
                         ElMessage.error(errorData.message || '批量处理请求失败')
                     }
+                } else if (error.code === 'ECONNABORTED') {
+                    ElMessage.error('请求超时，请检查网络连接')
                 } else {
                     ElMessage.error(error instanceof Error ? error.message : '批量处理失败')
                 }
@@ -527,7 +594,8 @@ export default defineComponent({
                 clearInterval(progressPollInterval.value)
             }
 
-            pollFailureCount.value = 0 // 重置失败计数
+            pollFailureCount.value = 0
+            let consecutiveNotFoundCount = 0 // 新增：连续"任务不存在"计数
 
             progressPollInterval.value = window.setInterval(async () => {
                 try {
@@ -536,10 +604,12 @@ export default defineComponent({
                         return
                     }
 
-                    const response = await axiosInstance.get(`/api/progress/${currentTaskId.value}`)
+                    const response = await axiosInstance.get(`/api/progress/${currentTaskId.value}`, {
+                      timeout: 5000 // 设置5秒超时
+                    })
                     
-                    // 重置失败计数
                     pollFailureCount.value = 0
+                    consecutiveNotFoundCount = 0 // 重置
                     
                     if (response.data.success) {
                         const progress = response.data.progress
@@ -548,72 +618,65 @@ export default defineComponent({
                         completedCount.value = progress.current_file_index || 0
                         currentFileProgress.value = progress.current_file_progress || 0
                         
-                        // 更新当前处理文件
                         if (progress.current_file_name) {
-                            currentFile.value = { 
-                                name: progress.current_file_name,
-                                status: 'uploading',
-                                uid: Date.now()
-                            } as UploadFile
+                          currentFile.value = { 
+                            name: progress.current_file_name,
+                            status: 'uploading',
+                            uid: Date.now()
+                          } as UploadFile
                         }
                         
-                        // 检查是否完成
+                        // 检查完成状态
                         if (progress.stage === 'completed' || progress.stage === 'cancelled' || progress.stage === 'error') {
-                            stopProgressPolling()
-                            
-                            // 处理最终结果
-                            if (progress.processed_files && progress.processed_files.length > 0) {
-                                processBatchResults(progress.processed_files)
-                            }
-                            
-                            // 结束处理
-                            processing.value = false
-                            currentFile.value = null
-                            currentTaskId.value = null
-                            currentFileProgress.value = 0
-                            stopTimer()
-                            
-                            // 显示完成消息
-                            if (progress.stage === 'completed') {
-                                ElMessage.success(`批量处理完成！成功处理 ${successfulCount.value} 个文件`)
-                            } else if (progress.stage === 'cancelled') {
-                                ElMessage.warning(`批量处理已取消！已处理 ${successfulCount.value} 个文件`)
-                            } else if (progress.stage === 'error') {
-                                ElMessage.error(`批量处理出错：${progress.error || '未知错误'}`)
-                            }
+                          console.log('任务完成，停止轮询')
+                          stopProgressPolling()
+                          handleTaskCompletion(progress)
                         }
                     } else {
-                        // 任务不存在或获取进度失败，但不要立即终止，可能是临时网络问题
-                        console.warn('获取进度失败，继续尝试...', response.data.message)
-                        pollFailureCount.value++
-                        
-                        // 如果连续失败超过5次，停止轮询
-                        if (pollFailureCount.value >= 5) {
+                        // 任务不存在的情况
+                        if (response.data.message?.includes('任务不存在') || 
+                            response.data.message?.includes('Task not found')) {
+                          consecutiveNotFoundCount++
+                          console.warn(`任务不存在 (${consecutiveNotFoundCount}/3)`)
+                          
+                          // 连续3次"任务不存在"就认为任务已完成但数据被清理
+                          if (consecutiveNotFoundCount >= 3) {
+                            console.log('任务可能已完成但数据被清理，停止轮询')
                             stopProgressPolling()
-                            processing.value = false
-                            currentFile.value = null
-                            currentTaskId.value = null
-                            currentFileProgress.value = 0
-                            stopTimer()
-                            ElMessage.error('无法获取处理进度，任务可能已完成或失败')
+                            handleTaskNotFound()
+                            return
+                          }
+                        } else {
+                          pollFailureCount.value++
+                        }
+                        
+                        if (pollFailureCount.value >= 3) { // 减少失败次数阈值
+                          stopProgressPolling()
+                          handlePollingFailure()
                         }
                     }
                 } catch (error) {
                     console.error('轮询进度失败:', error)
-                    pollFailureCount.value++
                     
-                    // 如果连续失败超过5次，停止轮询
-                    if (pollFailureCount.value >= 5) {
+                    // 区分不同类型的错误
+                    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+                        console.warn('请求超时')
+                    } else if (error.response?.status === 404) {
+                        consecutiveNotFoundCount++
+                        if (consecutiveNotFoundCount >= 3) {
+                          stopProgressPolling()
+                          handleTaskNotFound()
+                          return
+                        }
+                    }
+                    
+                    pollFailureCount.value++
+                    if (pollFailureCount.value >= 3) {
                         stopProgressPolling()
-                        processing.value = false
-                        currentFile.value = null
-                        currentTaskId.value = null
-                        currentFileProgress.value = 0
-                        stopTimer()
-                        ElMessage.error('网络连接失败，无法获取处理进度')
+                        handlePollingFailure()
                     }
                 }
-            }, 1000) // 每秒轮询一次
+            }, 2000) // 增加轮询间隔到2秒，减少服务器压力
         }
 
         // 停止轮询进度
@@ -621,6 +684,54 @@ export default defineComponent({
             if (progressPollInterval.value) {
                 clearInterval(progressPollInterval.value)
                 progressPollInterval.value = null
+            }
+        }
+
+        // 新增：处理任务完成
+        const handleTaskCompletion = (progress: any) => {
+            if (progress.processed_files && progress.processed_files.length > 0) {
+                processBatchResults(progress.processed_files)
+            }
+            
+            finishProcessing(progress.stage)
+        }
+
+        // 新增：处理任务不存在（可能已完成但数据被清理）
+        const handleTaskNotFound = () => {
+            console.log('任务数据不存在，可能已完成')
+            ElMessage.warning('无法获取任务进度，任务可能已完成。请检查处理结果。')
+            finishProcessing('unknown')
+        }
+
+        // 新增：处理轮询失败
+        const handlePollingFailure = () => {
+            console.log('轮询失败次数过多，停止轮询')
+            ElMessage.error('网络连接不稳定，无法获取处理进度')
+            finishProcessing('error')
+        }
+
+        // 新增：统一的处理结束逻辑
+        const finishProcessing = (stage: string) => {
+            processing.value = false
+            currentFile.value = null
+            currentTaskId.value = null
+            currentFileProgress.value = 0
+            stopTimer()
+            
+            // 根据完成状态显示消息
+            switch (stage) {
+                case 'completed':
+                    ElMessage.success(`批量处理完成！成功处理 ${successfulCount.value} 个文件`)
+                    break
+                case 'cancelled':
+                    ElMessage.warning(`批量处理已取消！已处理 ${successfulCount.value} 个文件`)
+                    break
+                case 'error':
+                    ElMessage.error('批量处理出现错误')
+                    break
+                case 'unknown':
+                    ElMessage.info('批量处理状态未知，请检查结果')
+                    break
             }
         }
 
@@ -928,7 +1039,9 @@ export default defineComponent({
                 if (currentTaskId.value) {
                     try {
                         const xhr = new XMLHttpRequest()
-                        xhr.open('POST', `http://localhost:8090/api/cancel/${currentTaskId.value}`, false)
+                        // 使用相对路径而不是硬编码的IP地址
+                        xhr.open('POST', `/api/cancel/${currentTaskId.value}`, false)
+                        xhr.setRequestHeader('Authorization', `Bearer ${localStorage.getItem('token')}`)
                         xhr.send()
                     } catch (error) {
                         console.error('无法取消后端任务:', error)
@@ -991,7 +1104,12 @@ export default defineComponent({
             handleVideoMetadata,
             getVideoStatus,
             getVideoDataType,
-            getVideoDataLength
+            getVideoDataLength,
+            // 新增的处理函数
+            handleTaskCompletion,
+            handleTaskNotFound,
+            handlePollingFailure,
+            finishProcessing
         }
     }
 })

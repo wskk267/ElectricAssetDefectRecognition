@@ -215,6 +215,7 @@ CORS(app, resources={
 active_tasks = {}
 task_progress = {}
 task_lock = threading.Lock()
+recently_completed_tasks = {}  # 存储最近完成的任务进度数据
 
 # 配置上传文件夹
 UPLOAD_FOLDER = 'uploads'
@@ -260,6 +261,7 @@ def unregister_task(task_id):
     with task_lock:
         active_tasks.pop(task_id, None)
         task_progress.pop(task_id, None)
+        recently_completed_tasks.discard(task_id)  # 从最近完成的任务中移除
 
 def update_task_progress(task_id, **kwargs):
     """更新任务进度"""
@@ -383,23 +385,36 @@ def predict(user_info):
 
 @app.route('/api/progress/<task_id>', methods=['GET'])
 def get_progress(task_id):
-    """获取任务进度"""
     try:
+        # 检查任务是否存在
+        if task_id not in active_tasks:
+            # 检查是否是最近完成的任务
+            if task_id in recently_completed_tasks:
+                return jsonify({
+                    'success': True,
+                    'progress': recently_completed_tasks[task_id],
+                    'message': '任务已完成'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '任务不存在或已过期',
+                    'error_type': 'task_not_found'
+                }), 404
+
+        # 返回正常进度
         progress = get_task_progress(task_id)
-        if not progress:
-            return jsonify({
-                'success': False,
-                'message': '任务不存在'
-            }), 404
-        
         return jsonify({
             'success': True,
             'progress': progress
         })
+        
     except Exception as e:
+        logger.error(f"获取任务进度失败: {e}")
         return jsonify({
             'success': False,
-            'message': f'获取进度失败: {str(e)}'
+            'message': '获取进度失败',
+            'error_type': 'server_error'
         }), 500
 
 @app.route('/api/cancel/<task_id>', methods=['POST'])

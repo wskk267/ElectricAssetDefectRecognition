@@ -337,6 +337,7 @@ export default defineComponent({
     
     // 统计信息 - 修改为分别记录摄像头和检测时间
     const runningTime = ref<number>(0)
+    const startTime = ref<number>(0)
     const cameraStartTime = ref<number>(0) // 摄像头开始时间
     const detectionStartTime = ref<number>(0) // 检测开始时间，初始化为0
     const timeTimer = ref<number | null>(null)
@@ -368,7 +369,7 @@ export default defineComponent({
     const environmentStatus = ref({
       protocol: location.protocol,
       hostname: location.hostname,
-      isSecure: location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1',
+      isSecure: location.protocol === 'https:' || location.hostname === '8.148.78.38' || location.hostname === '127.0.0.1',
       hasMediaDevices: !!navigator.mediaDevices,
       hasGetUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
       hasEnumerateDevices: !!(navigator.mediaDevices && navigator.mediaDevices.enumerateDevices),
