@@ -460,7 +460,7 @@ export default defineComponent({
             // 检查是否有正在进行的任务
             if (currentTaskId.value) {
                 try {
-                    const checkResponse = await axiosInstance.get(`/api/progress/${currentTaskId.value}`)
+                    const checkResponse = await axiosInstance.get(`/api/tasks/progress/${currentTaskId.value}`)
                     if (checkResponse.data.success) {
                         const result = await ElMessageBox.confirm(
                           '检测到有正在进行的任务，是否继续监控该任务？',
@@ -548,7 +548,8 @@ export default defineComponent({
                     throw new Error(batchResult.message || '批量处理启动失败')
                 }
 
-            } catch (error) {
+            } catch (e) {
+                const error = e as any
                 console.error('批量处理失败:', error)
                 
                 // 详细的错误诊断
@@ -604,7 +605,7 @@ export default defineComponent({
                         return
                     }
 
-                    const response = await axiosInstance.get(`/api/progress/${currentTaskId.value}`, {
+                    const response = await axiosInstance.get(`/api/tasks/progress/${currentTaskId.value}`, {
                       timeout: 5000 // 设置5秒超时
                     })
                     
@@ -655,7 +656,8 @@ export default defineComponent({
                           handlePollingFailure()
                         }
                     }
-                } catch (error) {
+                } catch (e) {
+                    const error = e as any
                     console.error('轮询进度失败:', error)
                     
                     // 区分不同类型的错误
@@ -806,7 +808,7 @@ export default defineComponent({
 
             try {
                 // 调用后端取消API
-                await axiosInstance.post(`/api/cancel/${currentTaskId.value}`)
+                await axiosInstance.post(`/api/tasks/cancel/${currentTaskId.value}`)
                 ElMessage.info('正在取消处理，请稍候...')
             } catch (error) {
                 console.error('取消任务失败:', error)
@@ -1040,7 +1042,7 @@ export default defineComponent({
                     try {
                         const xhr = new XMLHttpRequest()
                         // 使用相对路径而不是硬编码的IP地址
-                        xhr.open('POST', `/api/cancel/${currentTaskId.value}`, false)
+                        xhr.open('POST', `/api/tasks/cancel/${currentTaskId.value}`, false)
                         xhr.setRequestHeader('Authorization', `Bearer ${localStorage.getItem('token')}`)
                         xhr.send()
                     } catch (error) {

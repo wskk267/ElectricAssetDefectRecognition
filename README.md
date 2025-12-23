@@ -80,13 +80,60 @@ Pinia 2.1+           # 状态管理
 
 ```
 Python 3.8+          # 编程语言
-Flask 2.3+           # 轻量级Web框架
+Flask 2.3+           # 轻量级Web框架 (采用Blueprints模块化架构)
 ultralytics 8.0+     # YOLO模型推理框架
 OpenCV 4.8+          # 计算机视觉库
 Pillow 10.0+         # 图像处理库
 PyMySQL              # MySQL数据库连接
 Flask-CORS           # 跨域请求处理
 ```
+
+## 🛠️ 安装与运行
+
+### 后端环境 (Backend)
+
+1. 进入后端目录：
+   ```bash
+   cd Backend
+   ```
+2. 安装依赖：
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. 启动服务 (默认端口 8090)：
+   ```bash
+   python app.py
+   ```
+
+### 前端环境 (Web)
+
+1. 进入前端目录：
+   ```bash
+   cd Web
+   ```
+2. 安装依赖：
+   ```bash
+   npm install
+   ```
+3. 启动开发服务器 (默认端口 5173)：
+   ```bash
+   npm run dev
+   ```
+
+## 📦 部署架构说明
+
+本系统采用前后端分离架构：
+
+- **前端 (Frontend)**: Vue 3 + Vite，构建后生成静态文件 (HTML/CSS/JS)。
+- **后端 (Backend)**: Flask API 服务，提供数据接口和模型推理能力。
+
+### 生产环境部署建议
+
+1. **前端打包**: 运行 `npm run build` 生成 `dist` 目录。
+2. **Web服务器 (Nginx)**: 
+   - 将 `dist` 目录部署到 Nginx 静态资源路径。
+   - 配置反向代理 (Reverse Proxy)，将 `/api` 开头的请求转发到后端服务 (如 `http://localhost:8090`)。
+3. **后端服务**: 建议使用 Gunicorn (Linux) 或 Waitress (Windows) 运行 Flask 应用，确保稳定性。
 
 ### 部署与运维
 

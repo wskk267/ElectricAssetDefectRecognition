@@ -18,7 +18,7 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 }
 
 const axiosInstance = axios.create({
-  baseURL: "http://10.100.136.251:8090",
+  baseURL: "http://127.0.0.1:8090",
   timeout: 10000
 });
 

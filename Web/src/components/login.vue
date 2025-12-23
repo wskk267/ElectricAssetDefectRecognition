@@ -121,7 +121,7 @@ export default defineComponent({
         // SHA256加密密码
         const hashedPassword = hashPassword(loginForm.password)
         
-        const response = await axiosInstance.post('/api/login', {
+        const response = await axiosInstance.post('/api/auth/login', {
           username: loginForm.username,
           password: hashedPassword,
           user_type: loginForm.userType
@@ -170,7 +170,7 @@ export default defineComponent({
         // 使用游客账号登录
         const hashedPassword = hashPassword('guest123')
         
-        const response = await axiosInstance.post('/api/login', {
+        const response = await axiosInstance.post('/api/auth/login', {
           username: 'guest',
           password: hashedPassword,
           user_type: 'user'

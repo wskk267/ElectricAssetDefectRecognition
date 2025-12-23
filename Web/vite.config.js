@@ -22,13 +22,13 @@ export default defineConfig({
     // 修复 HMR 在 HTTPS 下的问题
     hmr: {
       protocol: 'wss',  // 使用安全的 WebSocket
-      host: '10.100.136.251',
+      host: 'localhost',
       port: 5173
     },
     // 添加代理配置
     proxy: {
       '/api': {
-        target: 'https://10.100.136.251:8090',
+        target: 'https://127.0.0.1:8090', // 使用本地回环地址，避免防火墙或网络问题
         changeOrigin: true,
         secure: false, // 忽略证书验证
         configure: (proxy, options) => {

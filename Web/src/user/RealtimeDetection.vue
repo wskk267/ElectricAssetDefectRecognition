@@ -88,7 +88,7 @@
               :min="0.1" 
               :max="10" 
               :step="0.1"
-              :format-tooltip="(val) => `${val} 帧/秒`"
+              :format-tooltip="(val: number) => `${val} 帧/秒`"
               style="margin: 10px 0;"
             />
           </div>
@@ -280,7 +280,7 @@ export default defineComponent({
     // 检查用户权限 - 从后端实时验证
     const checkUserPermissions = async () => {
       try {
-        const response = await axiosInstance.get('/api/check-permissions')
+        const response = await axiosInstance.get('/api/user/check-permissions')
         if (response.data.success) {
           const permissions = response.data.data
           
@@ -299,7 +299,8 @@ export default defineComponent({
           ElMessage.error('权限验证失败，请重新登录')
           return false
         }
-      } catch (error) {
+      } catch (e) {
+        const error = e as any
         // console.error('权限检查失败:', error)
         if (error.response?.status === 401) {
           ElMessage.error('登录已过期，请重新登录')
@@ -549,7 +550,8 @@ export default defineComponent({
             //   label: d.label || '(仍无标签)', 
             //   kind: d.kind 
             // })))
-          } catch (permissionError) {
+          } catch (e) {
+            const permissionError = e as any
             // console.error('摄像头权限被拒绝:', permissionError)
             let errorMsg = '摄像头权限被拒绝'
             
@@ -592,7 +594,8 @@ export default defineComponent({
           ElMessage.success(`找到 ${availableDevices.value.length} 个摄像头设备`)
         }
         
-      } catch (error) {
+      } catch (e) {
+        const error = e as any
         // console.error('获取摄像头设备失败:', error)
         
         let errorMessage = '获取摄像头设备失败'
@@ -1173,7 +1176,8 @@ export default defineComponent({
               // 只在停止检测时记录总的检测时长
             }
             
-          } catch (error) {
+          } catch (e) {
+            const error = e as any
             // 检查是否是取消的请求
             if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
               // console.log('检测请求被取消')
